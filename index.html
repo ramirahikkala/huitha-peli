@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ellin eka peli</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #2b1b4d;
+      font-family: sans-serif;
+    }
+    #info {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-size: 20px;
+      text-shadow: 0 1px 4px black;
+      pointer-events: none;
+    }
+    canvas { display: block; touch-action: none; }
+
+    /* Kosketusohjaimet: näkyvät vain kosketusnäytöllä */
+    #kosketus { display: none; }
+    @media (any-pointer: coarse) { #kosketus { display: block; } }
+    #kosketus, #kosketus * { touch-action: none; user-select: none; -webkit-user-select: none; }
+    #ohjainPohja {
+      position: fixed; left: 24px; bottom: 28px; width: 130px; height: 130px; z-index: 5;
+      border-radius: 50%; background: rgba(255,255,255,0.22); border: 3px solid rgba(255,255,255,0.7);
+    }
+    #ohjainNuppi {
+      position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px;
+      border-radius: 50%; background: rgba(255,255,255,0.75); box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+    }
+    #hyppyNappi {
+      position: fixed; right: 28px; bottom: 44px; width: 86px; height: 86px; z-index: 5;
+      border-radius: 50%; border: 3px solid rgba(255,255,255,0.8); background: rgba(90,45,145,0.65);
+      color: white; font: bold 16px sans-serif;
+    }
+    #hyppyNappi:active { background: rgba(140,80,220,0.85); }
+    #lukkoNappi {
+      position: fixed; right: 50px; bottom: 148px; width: 44px; height: 44px; z-index: 5;
+      border-radius: 50%; border: 2px solid rgba(255,255,255,0.8); background: rgba(0,0,0,0.4);
+      font-size: 20px;
+    }
+
+    /* Pankki ja kauppa (oikea yläkulma) */
+    #pankki {
+      position: fixed; top: 10px; right: 10px; width: 230px;
+      color: white; font-size: 16px; text-shadow: 0 1px 4px black;
+    }
+    #pankkiPalkki {
+      height: 14px; background: rgba(0,0,0,0.45); border: 2px solid white;
+      border-radius: 8px; overflow: hidden; margin: 4px 0 6px;
+    }
+    #pankkiPalkki { position: relative; }
+    .viiva { position: absolute; top: 0; bottom: 0; width: 2px; background: white; }
+    #pankkiRajat { position: relative; height: 14px; font-size: 11px; margin: -2px 0 6px; }
+    #pankkiRajat span { position: absolute; transform: translateX(-50%); }
+    #pankkiRajat span:last-child { transform: translateX(-100%); }
+    #pankkiTaytto { height: 100%; width: 0; background: #b266ff; transition: width 0.3s; }
+    #pankkiTaytto.valmis { background: #2ecc40; }
+    #kauppaNappi, .kauppaNappi {
+      font: inherit; font-size: 14px; padding: 5px 10px; border-radius: 8px;
+      border: 2px solid white; background: #5a2d91; color: white; cursor: pointer;
+    }
+    .kauppaNappi:disabled { opacity: 0.45; cursor: default; }
+    #kauppa {
+      display: none; margin-top: 8px; padding: 10px; border-radius: 10px;
+      background: rgba(30, 10, 60, 0.92); border: 2px solid white; text-shadow: none;
+    }
+    #kauppa.auki { display: block; }
+    .tuote { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    .nayte { width: 26px; height: 26px; border: 2px solid white; border-radius: 4px; flex: none; }
+    .tuote span { flex: 1; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="info">
+    <div id="pisteet">Pisteet: 0</div>
+    <div id="lukko" style="font-size:14px"></div>
+    <div id="vastustajat" style="font-size:14px"></div>
+    <div style="pointer-events:auto; margin-top:4px">
+      <button id="lisaaVihu" class="kauppaNappi">➕ Lisää vastustaja (V)</button>
+      <button id="poistaVihu" class="kauppaNappi">➖ Poista (B)</button>
+    </div>
+    <div style="font-size:14px">E S D F liikuttavat (E eteen, D taakse, S vasen, F oikea) · välilyönti hyppää · vedä hiirellä kääntääksesi kameraa · rulla zoomaa · L lukitsee kuvakulman<br>Punaiset kuutiot jahtaavat (oranssi ampuu, isot hyppäävät korkealle) – häntä kasvaa pisteistä, mutta viholliset voivat katkaista sen! Piiloudu tunneliin tai palikan taakse!</div>
+  </div>
+
+  <!-- Pankki: kerätyt pisteet tallentuvat tänne -->
+  <div id="pankki">
+    <div id="pankkiTeksti">Pankki: 0 / 50</div>
+    <div id="pankkiPalkki">
+      <div id="pankkiTaytto"></div>
+      <div class="viiva" style="left:9.09%"></div>
+      <div class="viiva" style="left:27.27%"></div>
+      <div class="viiva" style="left:54.54%"></div>
+    </div>
+    <div id="pankkiRajat">
+      <span style="left:9.09%">10</span><span style="left:27.27%">30</span>
+      <span style="left:54.54%">60</span><span style="left:100%">110</span>
+    </div>
+    <button id="kauppaNappi">🛒 Kauppa</button>
+    <div id="kauppa"></div>
+  </div>
+
+  <!-- Kosketusohjaimet -->
+  <div id="kosketus">
+    <div id="ohjainPohja"><div id="ohjainNuppi"></div></div>
+    <button id="lukkoNappi">🔒</button>
+    <button id="hyppyNappi">Hyppy</button>
+  </div>
+
+  <!-- 3D-kirjasto (three.js) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    // --- Maailma ---
+    const maailma = new THREE.Scene();
+    maailma.background = new THREE.Color(0x6ec6ff);   // taivaan väri
+
+    const kamera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 400);
+    const piirtaja = new THREE.WebGLRenderer({ antialias: true });
+    piirtaja.setSize(innerWidth, innerHeight);
+    document.body.appendChild(piirtaja.domElement);
+
+    // Valot
+    maailma.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const aurinko = new THREE.DirectionalLight(0xffffff, 0.8);
+    aurinko.position.set(5, 10, 5);
+    maailma.add(aurinko);
+
+    // --- Kenttä ---
+    const KENTTA = 135;  // kentän koko (kokeile isompaa tai pienempää!)
+    maailma.fog = new THREE.Fog(0x6ec6ff, 50, 160);   // kaukana olevat himmenevät
+    const maa = new THREE.Mesh(
+      new THREE.PlaneGeometry(KENTTA, KENTTA),
+      new THREE.MeshLambertMaterial({ color: 0x7be0a4 })   // maan väri
+    );
+    maa.rotation.x = -Math.PI / 2;
+    maailma.add(maa);
+    maailma.add(new THREE.GridHelper(KENTTA, KENTTA, 0xffffff, 0xffffff));
+
+    // --- Pelaaja (violetti kuutio) ---
+    const pelaaja = new THREE.Mesh(
+      new THREE.BoxGeometry(1, 1, 1),
+      new THREE.MeshLambertMaterial({ color: 0x800080 })   // pelaajan väri
+    );
+    pelaaja.position.y = 0.5;
+    maailma.add(pelaaja);
+    const nopeus = 0.12;
+
+    // --- Esteet: palikat ja tunnelit ---
+    const esteet = [];                       // törmäyslaatikot
+    const tunnelit = [];                     // tunneleiden alueet (vihollinen ei näe sinne)
+    const alueet = [{ x: 0, z: 0, r: 5 }];   // varatut paikat (alussa vapaa tila pelaajalle)
+    const PALIKOITA = 200;                  // montako palikkaa
+    const TUNNELEITA = 50;                  // montako tunnelia
+
+    function satunnainen(a, b) { return a + Math.random() * (b - a); }
+    function satunnaisVari() { return new THREE.Color().setHSL(Math.random(), 0.6, 0.6); }
+
+    // Yksi laatikko: keskipiste (x, z), alareuna y0, koot sx/sy/sz
+    function laatikko(x, y0, z, sx, sy, sz, vari, tormaa) {
+      const m = new THREE.Mesh(
+        new THREE.BoxGeometry(sx, sy, sz),
+        new THREE.MeshLambertMaterial({ color: vari })
+      );
+      m.position.set(x, y0 + sy / 2, z);
+      maailma.add(m);
+      if (tormaa) esteet.push({
+        x1: x - sx / 2, x2: x + sx / 2, z1: z - sz / 2, z2: z + sz / 2,
+        y1: y0, y2: y0 + sy      // alareuna ja yläreuna
+      });
+    }
+
+    function vapaa(x, z, r) {
+      const raja = KENTTA / 2 - r - 1;
+      if (Math.abs(x) > raja || Math.abs(z) > raja) return false;
+      return alueet.every(a => Math.hypot(a.x - x, a.z - z) > a.r + r + 1.5);
+    }
+
+    function teePalikka() {
+      const sx = satunnainen(1, 5), sy = satunnainen(1, 6), sz = satunnainen(1, 5);
+      const r = Math.hypot(sx, sz) / 2;
+      for (let i = 0; i < 50; i++) {
+        const x = satunnainen(-KENTTA / 2, KENTTA / 2), z = satunnainen(-KENTTA / 2, KENTTA / 2);
+        if (vapaa(x, z, r)) {
+          laatikko(x, 0, z, sx, sy, sz, satunnaisVari(), true);
+          alueet.push({ x, z, r });
+          return;
+        }
+      }
+    }
+
+    function teeTunneli() {
+      const aukko = satunnainen(2.5, 4);        // aukon leveys
+      const pituus = satunnainen(4, 9);
+      const korkeus = satunnainen(2.5, 4.5);
+      const paksuus = 0.8;
+      const leveys = aukko + 2 * paksuus;
+      const pitkaZ = Math.random() < 0.5;       // suuntautuuko tunneli z- vai x-akselin suuntaan
+      const r = Math.hypot(leveys, pituus) / 2;
+      for (let i = 0; i < 50; i++) {
+        const x = satunnainen(-KENTTA / 2, KENTTA / 2), z = satunnainen(-KENTTA / 2, KENTTA / 2);
+        if (!vapaa(x, z, r)) continue;
+        const vari = satunnaisVari();
+        const d = aukko / 2 + paksuus / 2;
+        if (pitkaZ) {
+          laatikko(x - d, 0, z, paksuus, korkeus, pituus, vari, true);   // seinät
+          laatikko(x + d, 0, z, paksuus, korkeus, pituus, vari, true);
+          laatikko(x, korkeus, z, leveys, 0.6, pituus, vari, true);      // katto
+        } else {
+          laatikko(x, 0, z - d, pituus, korkeus, paksuus, vari, true);
+          laatikko(x, 0, z + d, pituus, korkeus, paksuus, vari, true);
+          laatikko(x, korkeus, z, pituus, 0.6, leveys, vari, true);
+        }
+        const puoliX = (pitkaZ ? leveys : pituus) / 2, puoliZ = (pitkaZ ? pituus : leveys) / 2;
+        tunnelit.push({ x1: x - puoliX, x2: x + puoliX, z1: z - puoliZ, z2: z + puoliZ, h: korkeus });
+        alueet.push({ x, z, r });
+        return;
+      }
+    }
+
+    for (let i = 0; i < TUNNELEITA; i++) teeTunneli();
+    for (let i = 0; i < PALIKOITA; i++) teePalikka();
+
+    // Osuuko kuutio esteeseen? x, z = paikka, p = puolikas leveys,
+    // y = keskikorkeus, k = puolikas korkeus
+    function osuuEsteeseen(x, z, p, y = 0.5, k = 0.5) {
+      const jalka = y - k + 0.001, paa = y + k - 0.001;
+      return esteet.some(e =>
+        x + p > e.x1 && x - p < e.x2 && z + p > e.z1 && z - p < e.z2 &&
+        jalka < e.y2 && paa > e.y1
+      );
+    }
+
+    // --- Hyppy ja painovoima ---
+    const painovoima = 0.01;
+    const hyppyKorkeus = 3;     // hyppy nousee 3 × oman koon verran
+    pelaaja.userData = { vy: 0, maassa: true, koko: 1 };
+
+    // Pudottaa kuution alas tai nostaa sitä hypyssä; pysähtyy maahan, palikoiden päälle ja kattoihin
+    function putoa(kuutio) {
+      const t = kuutio.userData;
+      const x = kuutio.position.x, z = kuutio.position.z;
+      const vanhaY = kuutio.position.y;
+      t.vy -= painovoima;
+      let uusiY = vanhaY + t.vy;
+      t.maassa = false;
+      const h = t.koko / 2;                                // puolet kuution koosta
+      const alla = e => x + h > e.x1 && x - h < e.x2 && z + h > e.z1 && z - h < e.z2;
+
+      if (t.vy <= 0) {
+        let lattia = h;                                    // maa
+        for (const e of esteet) {
+          if (alla(e) && e.y2 <= vanhaY - h + 0.001 && e.y2 + h > lattia) lattia = e.y2 + h;
+        }
+        if (uusiY <= lattia) { uusiY = lattia; t.vy = 0; t.maassa = true; }
+      } else {
+        let katto = Infinity;                              // pää osuu kattoon
+        for (const e of esteet) {
+          if (alla(e) && e.y1 >= vanhaY + h - 0.001 && e.y1 < katto) katto = e.y1;
+        }
+        if (uusiY + h > katto) { uusiY = katto - h; t.vy = 0; }
+      }
+      kuutio.position.y = uusiY;
+    }
+
+    function hyppaa(kuutio) {
+      const t = kuutio.userData;
+      if (t.maassa) {
+        t.vy = Math.sqrt(2 * painovoima * hyppyKorkeus * t.koko);   // v = √(2·g·korkeus)
+        t.maassa = false;
+      }
+    }
+
+    // --- Tähti (keltainen, pyörii) ---
+    const tahti = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.8),     // tähden koko (ennen 0.5)
+      new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0x665500 })
+    );
+    tahti.position.y = 1;
+    maailma.add(tahti);
+    let tahtiKorkeus = 1;                    // tähden korkeus (leijuu tämän ympärillä)
+
+    // Pinnat, joille tähden voi laittaa: palikoiden ja tunneleiden päälle, kunhan pelaaja pääsee sinne.
+    // Matalat pinnat saavutetaan hyppäämällä maasta, korkeammille pääsee toisen palikan kautta.
+    const pinnat = [];
+    {
+      const HYPPY = 2.6;   // kuinka paljon ylöspäin pelaaja varmasti yltää (hyppy on 3)
+      // pinta on peitetty, jos sen päällä on toinen laatikko (esim. tunnelin seinän päällä katto)
+      const peitetty = e => esteet.some(f => f !== e &&
+        f.x1 < e.x2 && f.x2 > e.x1 && f.z1 < e.z2 && f.z2 > e.z1 &&
+        f.y1 <= e.y2 + 0.01 && f.y2 > e.y2 + 0.01);
+      const ehdokkaat = esteet.filter(e => !peitetty(e));
+      const vali = (a, b) => Math.hypot(
+        Math.max(0, a.x1 - b.x2, b.x1 - a.x2),
+        Math.max(0, a.z1 - b.z2, b.z1 - a.z2)
+      );
+      const paasee = new Set(ehdokkaat.filter(e => e.y2 <= HYPPY));
+      let muuttui = true;
+      while (muuttui) {
+        muuttui = false;
+        for (const e of ehdokkaat) {
+          if (paasee.has(e)) continue;
+          for (const f of paasee) {
+            if (f.y2 >= e.y2 - HYPPY && vali(e, f) <= 1.5) { paasee.add(e); muuttui = true; break; }
+          }
+        }
+      }
+      pinnat.push(...paasee);
+    }
+
+    // Tähtien värit (sama väri tulee hännän palaan, kun tähden kerää)
+    let TAHTIEN_VARIT = [      // vaihtuu pelaajan kuution mukaan (ks. tahtienVaritKuutiolle)
+      0xb266ff,   // lila
+      0xff4dff,   // magenta
+      0xff5fbf,   // pinkki
+      0x7a5cff,   // indigo
+      0xd9a0ff,   // vaalea laventeli
+      0x4d7bff    // sinivioletti
+    ];
+    let tahtiVari = TAHTIEN_VARIT[0];
+
+    function satunnainenTahdenVari() {
+      return TAHTIEN_VARIT[Math.floor(Math.random() * TAHTIEN_VARIT.length)];
+    }
+
+    // Arpoo tähdelle uuden värin nykyisestä paletista
+    function arvoTahdenVari() {
+      tahtiVari = satunnainenTahdenVari();
+      tahti.material.color.set(tahtiVari);
+      tahti.material.emissive.set(tahtiVari).multiplyScalar(0.4);   // hohto
+    }
+
+    function uusiTahti() {
+      arvoTahdenVari();     // uusi väri pelaajan sävyistä
+
+      // Joka toisella kerralla tähti on palikan tai tunnelin päällä
+      if (pinnat.length > 0 && Math.random() < 0.5) {
+        const e = pinnat[Math.floor(Math.random() * pinnat.length)];
+        const sisaan = 0.6;
+        tahti.position.x = e.x2 - e.x1 > 2 * sisaan ? satunnainen(e.x1 + sisaan, e.x2 - sisaan) : (e.x1 + e.x2) / 2;
+        tahti.position.z = e.z2 - e.z1 > 2 * sisaan ? satunnainen(e.z1 + sisaan, e.z2 - sisaan) : (e.z1 + e.z2) / 2;
+        tahtiKorkeus = e.y2 + 1;
+        return;
+      }
+      const raja = KENTTA / 2 - 1;
+      do {
+        tahti.position.x = (Math.random() * 2 - 1) * raja;
+        tahti.position.z = (Math.random() * 2 - 1) * raja;
+      } while (osuuEsteeseen(tahti.position.x, tahti.position.z, 1.0));   // ei esteen sisään
+      tahtiKorkeus = 1;
+    }
+    uusiTahti();
+
+    // --- Viholliset (punaiset kuutiot, jahtaavat pelaajaa) ---
+    const VIHOLLISIA = 6;             // montako jahtaajaa yhteensä
+    const nakoEtaisyys = 30;          // kuinka kauas vihollinen näkee
+    const viholliset = [];
+
+    // Vihollistyypit: koko, nopeus (pelaajan nopeus on 0.12), värit, ampuuko
+    const NORMAALI = { koko: 1, nopeus: 0.07, vari: 0xff0000, himmea: 0x802020, ampuu: false };
+    const AMPUJA   = { koko: 1, nopeus: 0.04, vari: 0xff9900, himmea: 0x885500, ampuu: true, hohto: 0xff6600 };   // hidas, ampuu
+    const ISO      = { koko: 2, nopeus: 0.10, vari: 0xb00020, himmea: 0x500010, ampuu: false };  // iso, nopea, hyppää korkealle
+
+    // 1 ampuja, 2 isoa, loput tavallisia
+    const vihollislista = [AMPUJA, ISO, ISO];
+    while (vihollislista.length < VIHOLLISIA) vihollislista.push(NORMAALI);
+
+    function siirraViholliseenKauas(v) {
+      const h = v.userData.koko / 2;
+      do {
+        v.position.x = satunnainen(-KENTTA / 2 + 2, KENTTA / 2 - 2);
+        v.position.z = satunnainen(-KENTTA / 2 + 2, KENTTA / 2 - 2);
+      } while (
+        osuuEsteeseen(v.position.x, v.position.z, h + 0.1, h, h) ||
+        v.position.distanceTo(pelaaja.position) < 15
+      );
+    }
+
+    function luoVihollinen(tyyppi) {
+      const v = new THREE.Mesh(
+        new THREE.BoxGeometry(tyyppi.koko, tyyppi.koko, tyyppi.koko),
+        new THREE.MeshLambertMaterial({ color: tyyppi.himmea, emissive: tyyppi.hohto || 0x000000 })
+      );
+      v.position.y = tyyppi.koko / 2;
+      v.userData = { vy: 0, maassa: true, lataus: 60, kohde: null, ...tyyppi };
+      if (tyyppi.hohto) {
+        // Hohto: oikea valo ympäristöön + läpikuultava hehkupallo, joka näkyy kauas
+        v.add(new THREE.PointLight(tyyppi.hohto, 2, 20));
+        v.add(new THREE.Mesh(
+          new THREE.SphereGeometry(1.8, 16, 16),
+          new THREE.MeshBasicMaterial({
+            color: tyyppi.hohto, transparent: true, opacity: 0.25,
+            blending: THREE.AdditiveBlending, depthWrite: false, fog: false
+          })
+        ));
+      }
+      maailma.add(v);
+      siirraViholliseenKauas(v);
+      viholliset.push(v);
+    }
+
+    vihollislista.forEach(luoVihollinen);
+
+    // --- Pelaajan itse lisäämät vastustajat: mitä enemmän, sitä enemmän yksi timantti on arvoltaan ---
+    const MAX_LISATTYJA = 30;
+    const lisatyt = [];                              // pelaajan lisäämät viholliset
+    const timantinArvo = () => 1 + Math.floor(lisatyt.length / 2);   // pisteitä yhdestä timantista (2 lisättyä = +1)
+
+    function paivitaVastustajat() {
+      const ampujia = viholliset.filter(v => v.userData.ampuu).length;
+      const isoja = viholliset.filter(v => v.userData.koko > 1).length;
+      const tavallisia = viholliset.length - ampujia - isoja;
+      document.getElementById("vastustajat").textContent =
+        "Vastustajia: " + viholliset.length + " (tavallisia " + tavallisia + " · isoja " + isoja + " · ampujia " + ampujia + ")" +
+        " · Timantti = " + timantinArvo() + " pistettä";
+    }
+
+    // Lisättävät vastustajat vuorottelevat tyypeittäin, joten lisättyjä on kutakin tyyppiä yhtä paljon
+    const LISATTAVAT = [NORMAALI, ISO, AMPUJA];
+
+    function lisaaVastustaja() {
+      if (lisatyt.length >= MAX_LISATTYJA) return;
+      luoVihollinen(LISATTAVAT[lisatyt.length % LISATTAVAT.length]);   // tavallinen → iso → ampuja → ...
+      lisatyt.push(viholliset[viholliset.length - 1]);
+      paivitaVastustajat();
+    }
+
+    function poistaVastustaja() {
+      const v = lisatyt.pop();                       // poistaa vain itse lisättyjä
+      if (!v) return;
+      maailma.remove(v);
+      viholliset.splice(viholliset.indexOf(v), 1);
+      paivitaVastustajat();
+    }
+
+    document.getElementById("lisaaVihu").addEventListener("click", e => { lisaaVastustaja(); e.currentTarget.blur(); });
+    document.getElementById("poistaVihu").addEventListener("click", e => { poistaVastustaja(); e.currentTarget.blur(); });
+    paivitaVastustajat();
+
+    // --- Ampujan luodit ---
+    const luodit = [];
+    function ammu(ampuja, kohde) {
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.25, 12, 12),
+        new THREE.MeshBasicMaterial({ color: 0xffaa00 })
+      );
+      mesh.position.copy(ampuja.position);
+      const suunta = kohde.position.clone().sub(ampuja.position).normalize().multiplyScalar(0.3);
+      maailma.add(mesh);
+      luodit.push({ mesh, suunta, ikaa: 0 });
+    }
+
+    // Onko piste tunnelin sisällä?
+    function tunnelissa(piste) {
+      return tunnelit.some(t => piste.x > t.x1 && piste.x < t.x2 && piste.z > t.z1 && piste.z < t.z2 && piste.y < t.h);
+    }
+
+    // Näkeekö vihollinen kohteen (pelaajan tai hännän palan)?
+    // Ei, jos este on välissä, kohde on liian kaukana tai tunnelissa.
+    function vihollinenNakee(vihollinen, kohde) {
+      const piste = kohde.position;
+      if (tunnelissa(piste)) return false;
+      const ax = vihollinen.position.x, az = vihollinen.position.z;
+      const dx = piste.x - ax, dz = piste.z - az;
+      const matka = Math.hypot(dx, dz);
+      if (matka > nakoEtaisyys) return false;
+      const ay = vihollinen.position.y, dy = piste.y - ay;
+      for (let d = 0.5; d < matka; d += 0.3) {
+        // näkölinja nousee tai laskee vihollisesta kohteeseen
+        if (osuuEsteeseen(ax + dx / matka * d, az + dz / matka * d, 0.1, ay + dy * d / matka, 0.05)) return false;
+      }
+      return true;
+    }
+
+    let pisteet = 0;
+
+    // --- Häntä: yksi kuutio jokaisesta pisteestä, seuraa pelaajan kulkemaa reittiä ---
+    const hanta = [];
+    const HANNAN_KOKO = 0.8;                       // hännän palan koko
+    const HANNAN_VALI = 1.0;                       // etäisyys palojen välillä
+    const polku = [pelaaja.position.clone()];      // pelaajan kulkema reitti
+
+    function lisaaHantaPala(vari) {
+      const pala = new THREE.Mesh(
+        new THREE.BoxGeometry(HANNAN_KOKO, HANNAN_KOKO, HANNAN_KOKO),
+        new THREE.MeshLambertMaterial({ color: vari })   // hännän palan väri = tähden väri
+      );
+      pala.position.copy(hanta.length ? hanta[hanta.length - 1].position : pelaaja.position);
+      maailma.add(pala);
+      hanta.push(pala);
+    }
+
+    // Katkaisee hännän kohdasta "mista" alkaen (pisteet säilyvät)
+    function katkaiseHanta(mista) {
+      while (hanta.length > mista) maailma.remove(hanta.pop());
+    }
+
+    function paivitaHanta() {
+      // Muistetaan pelaajan reitti
+      if (polku[polku.length - 1].distanceTo(pelaaja.position) >= 0.1) {
+        polku.push(pelaaja.position.clone());
+        if (polku.length > 4000) polku.splice(0, 1000);
+      }
+      // Asetetaan palat reitin varrelle pelaajan perään
+      const edellinen = pelaaja.position.clone();
+      let jaljella = HANNAN_VALI;
+      let i = polku.length - 1;
+      let pala = 0;
+      while (pala < hanta.length && i >= 0) {
+        const p = polku[i];
+        const d = edellinen.distanceTo(p);
+        if (d >= jaljella) {
+          edellinen.lerp(p, jaljella / d);
+          hanta[pala].position.copy(edellinen);
+          hanta[pala].position.y -= (1 - HANNAN_KOKO) / 2;   // pohja samalle tasolle pelaajan kanssa
+          pala++;
+          jaljella = HANNAN_VALI;
+        } else {
+          jaljella -= d;
+          edellinen.copy(p);
+          i--;
+        }
+      }
+      for (; pala < hanta.length; pala++) {          // reittiä ei vielä riitä: jäävät alkuun
+        hanta[pala].position.copy(polku[0]);
+      }
+    }
+
+    // Valitaan lähin kohde, jonka vihollinen näkee: pelaaja tai hännän pala
+    let kehys = 0;
+    function valitseKohde(vihollinen, numero) {
+      const t = vihollinen.userData;
+      // Katsotaan uudelleen vain joka viides kuva (säästää tehoa)
+      if ((kehys + numero) % 5 !== 0 && (t.kohde === null || t.kohde === pelaaja || hanta.includes(t.kohde))) {
+        return t.kohde;
+      }
+      const ehdokkaat = [pelaaja, ...hanta]
+        .map(k => ({ k, d: vihollinen.position.distanceTo(k.position) }))
+        .filter(e => e.d <= nakoEtaisyys)
+        .sort((a, b) => a.d - b.d)
+        .slice(0, 6);
+      t.kohde = null;
+      for (const e of ehdokkaat) {
+        if (vihollinenNakee(vihollinen, e.k)) { t.kohde = e.k; break; }
+      }
+      return t.kohde;
+    }
+
+    // --- Kameran kääntö hiirellä ---
+    let kulmaV = 0.8;     // vaakakulma
+    let kulmaP = 0.7;     // pystykulma
+    let etaisyys = 14;    // etäisyys pelaajasta
+    let vedetaan = false, edellinenX = 0, edellinenY = 0;
+    let kulmaLukittu = false;   // L-näppäin (tai 🔒-nappi) lukitsee kuvakulman
+    function vaihdaLukitus() {
+      kulmaLukittu = !kulmaLukittu;
+      document.getElementById("lukko").textContent = kulmaLukittu ? "🔒 Kuvakulma lukittu (L vapauttaa)" : "";
+    }
+
+    // Kamera: hiiri tai yksi sormi kääntää, kaksi sormea (nipistys) zoomaa
+    const osoittimet = new Map();     // kankaalla painetut hiiri/sormet
+    let edellinenVali = 0;
+    function osoittimienVali() {
+      const [a, b] = [...osoittimet.values()];
+      return Math.hypot(a.x - b.x, a.y - b.y);
+    }
+    piirtaja.domElement.addEventListener("pointerdown", e => {
+      osoittimet.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (osoittimet.size === 2) edellinenVali = osoittimienVali();
+    });
+    const osoitinPois = e => osoittimet.delete(e.pointerId);
+    addEventListener("pointerup", osoitinPois);
+    addEventListener("pointercancel", osoitinPois);
+    addEventListener("pointermove", e => {
+      const o = osoittimet.get(e.pointerId);
+      if (!o) return;
+      if (osoittimet.size === 1 && !kulmaLukittu) {
+        kulmaV -= (e.clientX - o.x) * 0.01;
+        kulmaP += (e.clientY - o.y) * 0.01;
+        kulmaP = Math.max(0.1, Math.min(1.5, kulmaP));   // ei maan alle
+      }
+      o.x = e.clientX; o.y = e.clientY;
+      if (osoittimet.size === 2) {
+        const vali = osoittimienVali();
+        etaisyys = Math.max(5, Math.min(30, etaisyys - (vali - edellinenVali) * 0.05));
+        edellinenVali = vali;
+      }
+    });
+    addEventListener("wheel", e => {
+      etaisyys = Math.max(5, Math.min(30, etaisyys + e.deltaY * 0.01));
+    });
+
+    // --- Näppäimet ---
+    const napit = {};
+    addEventListener("keydown", e => {
+      napit[e.key.toLowerCase()] = true;   // pienillä kirjaimilla, jotta Caps Lock ei haittaa
+      if (e.key === " ") e.preventDefault();   // ettei sivu vieri välilyönnistä
+      if (e.key.toLowerCase() === "v" && !e.repeat) lisaaVastustaja();     // V = lisää vastustaja
+      if (e.key.toLowerCase() === "b" && !e.repeat) poistaVastustaja();    // B = poista lisätty vastustaja
+      if (e.key.toLowerCase() === "l" && !e.repeat) {      // L = lukitse / vapauta kuvakulma
+        vaihdaLukitus();
+      }
+    });
+    addEventListener("keyup", e => napit[e.key.toLowerCase()] = false);
+
+    // --- Kosketusohjaimet (kuten Robloxissa) ---
+    // Vasemmalla ohjaussauva liikuttaa, oikealla on hyppynappi, ja muualle koskettamalla kameraa käännetään.
+    const ohjain = { x: 0, y: 0 };      // sauvan asento, -1...1
+    {
+      const pohja = document.getElementById("ohjainPohja");
+      const nuppi = document.getElementById("ohjainNuppi");
+      const SADE = 50;
+      let osoitin = null;
+
+      function asetaOhjain(e) {
+        const r = pohja.getBoundingClientRect();
+        let dx = e.clientX - (r.left + r.width / 2);
+        let dy = e.clientY - (r.top + r.height / 2);
+        const pit = Math.hypot(dx, dy);
+        if (pit > SADE) { dx = dx / pit * SADE; dy = dy / pit * SADE; }
+        nuppi.style.transform = "translate(" + dx + "px, " + dy + "px)";
+        ohjain.x = dx / SADE;
+        ohjain.y = dy / SADE;
+      }
+      pohja.addEventListener("pointerdown", e => {
+        osoitin = e.pointerId;
+        pohja.setPointerCapture(e.pointerId);
+        asetaOhjain(e);
+      });
+      pohja.addEventListener("pointermove", e => { if (e.pointerId === osoitin) asetaOhjain(e); });
+      const ohjainLoppu = e => {
+        if (e.pointerId !== osoitin) return;
+        osoitin = null;
+        ohjain.x = 0; ohjain.y = 0;
+        nuppi.style.transform = "translate(0px, 0px)";
+      };
+      pohja.addEventListener("pointerup", ohjainLoppu);
+      pohja.addEventListener("pointercancel", ohjainLoppu);
+
+      // Hyppynappi (pohjassa pidettäessä hyppää aina kun on maassa)
+      const hyppyNappi = document.getElementById("hyppyNappi");
+      hyppyNappi.addEventListener("pointerdown", e => { napit[" "] = true; hyppyNappi.setPointerCapture(e.pointerId); });
+      const hyppyLoppu = () => { napit[" "] = false; };
+      hyppyNappi.addEventListener("pointerup", hyppyLoppu);
+      hyppyNappi.addEventListener("pointercancel", hyppyLoppu);
+
+      document.getElementById("lukkoNappi").addEventListener("click", vaihdaLukitus);
+
+      // Ohjaimet näkyvät kosketusnäytöllä (tai osoitteella ...?kosketus kokeilua varten)
+      if (location.search.includes("kosketus")) document.getElementById("kosketus").style.display = "block";
+    }
+
+    // --- Pankki ja kauppa ---
+    // Jokainen kerätty tähti tallentuu pankkiin (myös jos häntä katkeaa).
+    // Kun pankissa on 50 pistettä, voi ostaa uuden värisen kuution.
+    // Hinnat: tavalliset värit 10, kaksivärisiä 30, monivärisiä 60, mandariini 110 (jos hintaa ei ole, se on 10)
+    const PANKKI_MAX = 110;                  // palkki täyttyy tähän
+    const hinta = k => k.hinta !== undefined ? k.hinta : 10;
+    const KUUTIOT = [
+      { nimi: "Violetti",  vari: 0x800080, hinta: 0 },   // alkuperäinen, ilmainen
+      { nimi: "Sininen",   vari: 0x2f80ff },
+      { nimi: "Vihreä",    vari: 0x2ecc40 },
+      { nimi: "Keltainen", vari: 0xffd700 },
+      { nimi: "Oranssi",   vari: 0xff8c1a },
+      { nimi: "Turkoosi",  vari: 0x1de9d6 },
+      { nimi: "Pinkki",    vari: 0xff5fbf },
+      { nimi: "Valkoinen", vari: 0xffffff },
+      { nimi: "Musta",     vari: 0x222222 },
+      // 60 pistettä: monivärisiä kuutioita
+      { nimi: "Kuusivärinen", tyyppi: "monivari", hinta: 60,
+        varit: [0xff5252, 0x2f80ff, 0x2ecc40, 0xffd700, 0xff8c1a, 0xb266ff] },   // jokaisella sivulla oma väri
+      { nimi: "Sateenkaari",  tyyppi: "sateenkaari", hinta: 60 },                // väri vaihtuu koko ajan
+      // 110 pistettä: mandariini
+      { nimi: "Mandariini",   tyyppi: "mandariini", hinta: 110 },
+      // 30 pistettä: kaksivärisiä kuutioita
+      { nimi: "Sini-valkoinen",    tyyppi: "kaksivari", hinta: 30, varit: [0x2f80ff, 0xffffff] },
+      { nimi: "Pinkki-turkoosi",   tyyppi: "kaksivari", hinta: 30, varit: [0xff5fbf, 0x1de9d6] },
+      { nimi: "Oranssi-keltainen", tyyppi: "kaksivari", hinta: 30, varit: [0xff8c1a, 0xffd700] },
+      { nimi: "Musta-valkoinen",   tyyppi: "kaksivari", hinta: 30, varit: [0x222222, 0xffffff] }
+    ];
+
+    // Tallennus selaimen muistiin (säilyy, kun sivun lataa uudelleen)
+    let tila = { pankki: 0, omistetut: [0], valittu: 0 };
+    try {
+      const tallessa = JSON.parse(localStorage.getItem("ellinPeli"));
+      if (tallessa && Array.isArray(tallessa.omistetut)) tila = tallessa;
+    } catch (e) {}
+    function tallenna() {
+      try { localStorage.setItem("ellinPeli", JSON.stringify(tila)); } catch (e) {}
+    }
+
+    const hex = c => "#" + c.toString(16).padStart(6, "0");
+
+    // Kaupan esikatselun väri
+    function naytteenTausta(k) {
+      if (k.tyyppi === "monivari") return "linear-gradient(90deg," + k.varit.map(hex).join(",") + ")";
+      if (k.tyyppi === "sateenkaari") return "linear-gradient(90deg,#f33,#fa0,#ee3,#3c3,#39f,#a5f)";
+      if (k.tyyppi === "kaksivari") return "linear-gradient(90deg," + hex(k.varit[0]) + " 50%," + hex(k.varit[1]) + " 50%)";
+      if (k.tyyppi === "mandariini") return "radial-gradient(circle,#ffb347,#ff8a00)";
+      return hex(k.vari);
+    }
+
+    // Tähtien ja hännän sävyt pelaajan kuution mukaan: vaaleampia ja tummempia versioita samasta värisävystä
+    function tahtienVaritKuutiolle(k) {
+      let pohjat;
+      if (k.tyyppi === "monivari" || k.tyyppi === "kaksivari") pohjat = k.varit;   // kuution omat värit
+      else if (k.tyyppi === "sateenkaari") return [0xff4040, 0xffa020, 0xffe030, 0x40e060, 0x40a0ff, 0xb060ff];
+      else if (k.tyyppi === "mandariini") pohjat = [0xff8a00, 0xff6a00, 0xffa733, 0x3aa83a];
+      else pohjat = [k.vari];
+      const tulos = [];
+      const vaaleudet = [0.4, 0.55, 0.7, 0.85];
+      const savysiirrot = [-0.02, 0.02, -0.01, 0.01];
+      for (const c of pohjat) {
+        const hsl = {};
+        new THREE.Color(c).getHSL(hsl);
+        const kyllaisyys = hsl.s < 0.15 ? hsl.s : Math.max(hsl.s, 0.6);   // harmaat pysyvät harmaina
+        vaaleudet.forEach((l, j) => {
+          tulos.push(new THREE.Color().setHSL((hsl.h + savysiirrot[j] + 1) % 1, kyllaisyys, l).getHex());
+        });
+      }
+      return tulos;
+    }
+
+    function paivitaTahdenVarit(k) {
+      TAHTIEN_VARIT = tahtienVaritKuutiolle(k);
+      arvoTahdenVari();                                                // nykyinen tähti
+      for (const pala of hanta) pala.material.color.set(satunnainenTahdenVari());   // hännän palat
+    }
+
+    // Pelaajan ulkonäkö valitun tuotteen mukaan
+    const laatikkoMuoto = pelaaja.geometry;                      // tavallinen kuutio
+    const pallomuoto = new THREE.SphereGeometry(0.5, 28, 20);    // mandariinin muoto
+    let sateenkaari = false;                                     // vaihtuuko väri koko ajan
+    let mandariiniRyhma = null;                                  // mandariinin osat (kääntyy kulkusuuntaan)
+
+    // Mandariinin kuori: oranssi pohja, jossa pieniä tummia ja vaaleita pisteitä
+    let kuoriTekstuuri = null;
+    function mandariininKuori() {
+      if (kuoriTekstuuri) return kuoriTekstuuri;
+      const c = document.createElement("canvas");
+      c.width = 512; c.height = 256;
+      const g = c.getContext("2d");
+      g.fillStyle = "#ff8a00";
+      g.fillRect(0, 0, 512, 256);
+      for (let i = 0; i < 2500; i++) {
+        const x = Math.random() * 512, y = Math.random() * 256, r = 0.8 + Math.random() * 1.6;
+        g.fillStyle = Math.random() < 0.6 ? "rgba(190,80,0,0.55)" : "rgba(255,200,110,0.4)";
+        g.beginPath();
+        g.arc(x, y, r, 0, Math.PI * 2);
+        g.fill();
+      }
+      kuoriTekstuuri = new THREE.CanvasTexture(c);
+      return kuoriTekstuuri;
+    }
+
+    function asetaUlkoasu(i) {
+      const k = KUUTIOT[i] || KUUTIOT[0];
+      paivitaTahdenVarit(k);                                 // tähdet ja häntä pelaajan sävyyn
+      while (pelaaja.children.length) pelaaja.remove(pelaaja.children[0]);   // pois mandariinin lehti yms.
+      pelaaja.geometry = laatikkoMuoto;
+      sateenkaari = false;
+      mandariiniRyhma = null;
+      if (k.tyyppi === "monivari") {
+        pelaaja.material = k.varit.map(c => new THREE.MeshLambertMaterial({ color: c }));
+      } else if (k.tyyppi === "sateenkaari") {
+        pelaaja.material = new THREE.MeshLambertMaterial({ color: 0xff0000 });
+        sateenkaari = true;
+      } else if (k.tyyppi === "kaksivari") {
+        // kuution kuusi sivua vuorotellen kahdella värillä
+        const [a, b] = k.varit;
+        pelaaja.material = [a, b, a, b, a, b].map(c => new THREE.MeshLambertMaterial({ color: c }));
+      } else if (k.tyyppi === "mandariini") {
+        // Itse kuutio on näkymätön; mandariini on sen "lapsi" ja liikkuu mukana
+        pelaaja.material = new THREE.MeshBasicMaterial({ visible: false });
+        const kuori = mandariininKuori();
+        const runko = new THREE.Mesh(
+          pallomuoto,
+          new THREE.MeshStandardMaterial({
+            map: kuori, bumpMap: kuori, bumpScale: 2,     // kuoren pienet kuopat
+            emissive: 0x2a1500, roughness: 0.55, metalness: 0
+          })
+        );
+        runko.scale.set(1, 0.88, 1);       // mandariini on hieman litteä
+        runko.position.y = -0.06;          // pohja samalle tasolle kuin kuutiolla
+        const kupu = new THREE.Mesh(       // vihreä "nappi" päällä
+          new THREE.SphereGeometry(0.11, 12, 8),
+          new THREE.MeshLambertMaterial({ color: 0x2e8b2e })
+        );
+        kupu.scale.set(1, 0.35, 1);
+        kupu.position.y = 0.37;
+        const varsi = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.025, 0.035, 0.1, 8),
+          new THREE.MeshLambertMaterial({ color: 0x5a3a1a })
+        );
+        varsi.position.y = 0.42;
+        const lehti = new THREE.Mesh(
+          new THREE.SphereGeometry(0.17, 12, 8),
+          new THREE.MeshLambertMaterial({ color: 0x3aa83a })
+        );
+        lehti.scale.set(1, 0.15, 0.55);
+        lehti.position.set(0.13, 0.42, 0);
+        lehti.rotation.z = 0.3;
+        // Mandariini on ryhmä, jotta se voi kääntyä kulkusuuntaansa
+        const ryhma = new THREE.Group();
+        ryhma.rotation.y = kulmaV;          // aluksi kasvot kameraan päin
+        ryhma.add(runko, kupu, varsi, lehti);
+
+        // Silmät ja posket (kasvot ovat ryhmän +z-puolella)
+        const valkoinen = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const musta = new THREE.MeshLambertMaterial({ color: 0x111111 });
+        const punertava = new THREE.MeshLambertMaterial({ color: 0xff6f61 });
+        for (const puoli of [-1, 1]) {
+          const silma = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 12), valkoinen);
+          silma.position.set(0.17 * puoli, 0.08, 0.41);
+          const pupilli = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), musta);
+          pupilli.position.set(0.17 * puoli, 0.08, 0.47);
+          const poski = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), punertava);
+          poski.scale.set(1, 0.7, 0.35);
+          poski.position.set(0.3 * puoli, -0.04, 0.38);
+          ryhma.add(silma, pupilli, poski);
+        }
+
+        // Suu (hymy)
+        const suu = new THREE.Mesh(
+          new THREE.TorusGeometry(0.11, 0.02, 8, 20, Math.PI),
+          new THREE.MeshLambertMaterial({ color: 0x5a1a00 })
+        );
+        suu.rotation.z = Math.PI;           // kaari aukeaa ylöspäin → hymy
+        suu.position.set(0, -0.04, 0.49);
+        ryhma.add(suu);
+
+        // Hiukset: ohuita suortuvia, jotka sojottavat päältä eri suuntiin
+        const hiusMateriaali = new THREE.MeshLambertMaterial({ color: 0x3b2314 });
+        const ylos = new THREE.Vector3(0, 1, 0);
+        for (let n = 0; n < 16; n++) {
+          const kulma = n / 16 * Math.PI * 2;
+          const kallistus = 0.35 + (n % 3) * 0.2;
+          const suunta = new THREE.Vector3(
+            Math.sin(kallistus) * Math.cos(kulma),
+            Math.cos(kallistus),
+            Math.sin(kallistus) * Math.sin(kulma)
+          );
+          const pit = 0.28 + (n % 4) * 0.04;
+          const hius = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.022, pit, 6), hiusMateriaali);
+          hius.position.set(0.1 * Math.cos(kulma), 0.34, 0.1 * Math.sin(kulma)).addScaledVector(suunta, pit / 2);
+          hius.quaternion.setFromUnitVectors(ylos, suunta);
+          ryhma.add(hius);
+        }
+
+        pelaaja.add(ryhma);
+        mandariiniRyhma = ryhma;
+      } else {
+        pelaaja.material = new THREE.MeshLambertMaterial({ color: k.vari });
+      }
+    }
+    const kauppaPaneeli = document.getElementById("kauppa");
+
+    function paivitaPankki() {
+      const ostettavaa = KUUTIOT.some((k, i) => !tila.omistetut.includes(i) && tila.pankki >= hinta(k));
+      document.getElementById("pankkiTeksti").textContent =
+        "Pankki: " + tila.pankki + (ostettavaa ? "  – voit ostaa!" : "");
+      const taytto = document.getElementById("pankkiTaytto");
+      taytto.style.width = Math.min(100, tila.pankki / PANKKI_MAX * 100) + "%";
+      taytto.classList.toggle("valmis", ostettavaa);
+    }
+
+    function piirraKauppa() {
+      kauppaPaneeli.innerHTML = "";
+      // Näytetään halvimmat ensin (tallennetut ostokset säilyvät, koska numerointi ei muutu)
+      KUUTIOT.map((k, i) => i).sort((a, b) => hinta(KUUTIOT[a]) - hinta(KUUTIOT[b])).forEach(i => {
+        const k = KUUTIOT[i];
+        const omistaa = tila.omistetut.includes(i);
+        const rivi = document.createElement("div");
+        rivi.className = "tuote";
+        rivi.innerHTML = '<div class="nayte" style="background:' + naytteenTausta(k) + '"></div><span>' + k.nimi + "</span>";
+        const nappi = document.createElement("button");
+        nappi.className = "kauppaNappi";
+        if (omistaa) {
+          nappi.textContent = tila.valittu === i ? "Käytössä" : "Käytä";
+          nappi.disabled = tila.valittu === i;
+        } else {
+          nappi.textContent = "Osta " + hinta(k);
+          nappi.disabled = tila.pankki < hinta(k);
+        }
+        nappi.addEventListener("click", () => {
+          if (!omistaa) {
+            tila.pankki -= hinta(k);
+            tila.omistetut.push(i);
+          }
+          tila.valittu = i;
+          asetaUlkoasu(i);
+          tallenna();
+          paivitaPankki();
+          piirraKauppa();
+          nappi.blur();     // ettei välilyönti (hyppy) paina nappia uudelleen
+        });
+        rivi.appendChild(nappi);
+        kauppaPaneeli.appendChild(rivi);
+      });
+    }
+
+    function lisaaPankkiin(maara) {
+      tila.pankki += maara;
+      tallenna();
+      paivitaPankki();
+      if (kauppaPaneeli.classList.contains("auki")) piirraKauppa();
+    }
+
+    document.getElementById("kauppaNappi").addEventListener("click", e => {
+      kauppaPaneeli.classList.toggle("auki");
+      piirraKauppa();
+      e.currentTarget.blur();
+    });
+
+    asetaUlkoasu(tila.valittu);   // edellinen valinta käyttöön
+    paivitaPankki();
+
+    function paivita() {
+      // Liikutaan kameran suunnan mukaan (ylös = poispäin kamerasta)
+      const eteenX = -Math.sin(kulmaV), eteenZ = -Math.cos(kulmaV);
+      const sivuX = Math.cos(kulmaV),  sivuZ = -Math.sin(kulmaV);
+      let dx = 0, dz = 0;
+      if (napit["e"]) { dx += eteenX; dz += eteenZ; }   // E = eteen
+      if (napit["d"]) { dx -= eteenX; dz -= eteenZ; }   // D = taakse
+      if (napit["f"]) { dx += sivuX;  dz += sivuZ; }    // F = oikealle
+      if (napit["s"]) { dx -= sivuX;  dz -= sivuZ; }    // S = vasemmalle
+      if (Math.hypot(ohjain.x, ohjain.y) > 0.15) {      // kosketusohjain (ylös = eteen)
+        dx += eteenX * -ohjain.y + sivuX * ohjain.x;
+        dz += eteenZ * -ohjain.y + sivuZ * ohjain.x;
+      }
+      const pituus = Math.hypot(dx, dz);
+      if (pituus > 0) {
+        if (mandariiniRyhma) {              // mandariini kääntyy kulkusuuntaan
+          let ero = Math.atan2(dx, dz) - mandariiniRyhma.rotation.y;
+          ero = Math.atan2(Math.sin(ero), Math.cos(ero));   // lyhin kääntösuunta
+          mandariiniRyhma.rotation.y += ero * 0.2;
+        }
+        // Liikutaan akseli kerrallaan, jotta esteitä pitkin voi liukua
+        const uusiX = pelaaja.position.x + dx / pituus * nopeus;
+        if (!osuuEsteeseen(uusiX, pelaaja.position.z, 0.5, pelaaja.position.y)) pelaaja.position.x = uusiX;
+        const uusiZ = pelaaja.position.z + dz / pituus * nopeus;
+        if (!osuuEsteeseen(pelaaja.position.x, uusiZ, 0.5, pelaaja.position.y)) pelaaja.position.z = uusiZ;
+      }
+
+      // Hyppy (välilyönti) ja painovoima
+      if (napit[" "]) hyppaa(pelaaja);
+      putoa(pelaaja);
+
+      // Pysytään kentällä
+      const raja = KENTTA / 2 - 0.5;
+      pelaaja.position.x = Math.max(-raja, Math.min(raja, pelaaja.position.x));
+      pelaaja.position.z = Math.max(-raja, Math.min(raja, pelaaja.position.z));
+
+      paivitaHanta();
+      kehys++;
+
+      // Viholliset jahtaavat, jos näkevät pelaajan tai hännän
+      let jaiKiinni = false;
+      let katkoKohta = Infinity;      // mistä kohdasta häntä katkeaa
+      let ammusOsui = false;          // osuiko ampujan ammus pelaajaan
+      for (const [numero, vihollinen] of viholliset.entries()) {
+        const t = vihollinen.userData;
+        const h = t.koko / 2;
+        const kohde = valitseKohde(vihollinen, numero);
+        if (kohde) {
+          const vx = kohde.position.x - vihollinen.position.x;
+          const vz = kohde.position.z - vihollinen.position.z;
+          const vm = Math.hypot(vx, vz) || 0.001;
+          if (!t.ampuu || vm > 10) {         // ampuja pysähtyy ampumaetäisyydelle
+            const nx = vihollinen.position.x + vx / vm * t.nopeus;
+            let esto = false;
+            if (!osuuEsteeseen(nx, vihollinen.position.z, h, vihollinen.position.y, h)) vihollinen.position.x = nx;
+            else esto = true;
+            const nz = vihollinen.position.z + vz / vm * t.nopeus;
+            if (!osuuEsteeseen(vihollinen.position.x, nz, h, vihollinen.position.y, h)) vihollinen.position.z = nz;
+            else esto = true;
+            if (esto) hyppaa(vihollinen);    // este edessä → hypätään
+          }
+          if (t.ampuu) {                     // ampuja ampuu parin sekunnin välein
+            t.lataus--;
+            if (t.lataus <= 0 && vm < 25) { ammu(vihollinen, kohde); t.lataus = 100; }
+          }
+          vihollinen.material.color.set(t.vari);      // kirkas väri kun jahtaa
+        } else {
+          vihollinen.material.color.set(t.himmea);    // tumma kun ei näe
+        }
+        putoa(vihollinen);
+        if (vihollinen.position.distanceTo(pelaaja.position) < (t.koko + 1) / 2) jaiKiinni = true;
+        for (let k = 0; k < hanta.length; k++) {      // hyökkäys häntään
+          if (vihollinen.position.distanceTo(hanta[k].position) < (t.koko + HANNAN_KOKO) / 2) {
+            katkoKohta = Math.min(katkoKohta, k);
+            break;
+          }
+        }
+      }
+
+      // Luodit lentävät; osuvat pelaajaan tai esteeseen
+      for (let i = luodit.length - 1; i >= 0; i--) {
+        const l = luodit[i];
+        l.mesh.position.add(l.suunta);
+        l.ikaa++;
+        const p = l.mesh.position;
+        if (p.distanceTo(pelaaja.position) < 0.75) { jaiKiinni = true; ammusOsui = true; }   // osuma pelaajaan = peli hävitty
+        for (let k = 0; k < hanta.length; k++) {      // luoti osuu häntään → koko häntä katoaa
+          if (p.distanceTo(hanta[k].position) < 0.65) {
+            katkoKohta = 0;
+            l.ikaa = 999;                             // luoti katoaa
+            break;
+          }
+        }
+        if (osuuEsteeseen(p.x, p.z, 0.25, p.y, 0.25) || p.y < 0.1 || l.ikaa > 200) {
+          maailma.remove(l.mesh);
+          luodit.splice(i, 1);
+        }
+      }
+
+      // Katkesiko häntä?
+      if (katkoKohta !== Infinity && !jaiKiinni) {
+        const teksti = katkoKohta === 0 ? "Häntä katosi!" : "Häntä katkesi!";
+        katkaiseHanta(katkoKohta);
+        document.getElementById("pisteet").textContent = teksti + " Pisteet: " + pisteet;
+      }
+
+      // Jäikö pelaaja kiinni?
+      if (jaiKiinni) {
+        katkaiseHanta(0);                       // häntä katoaa, pisteet säilyvät
+        polku.length = 0;
+        polku.push(new THREE.Vector3(0, 0.5, 0));
+        document.getElementById("pisteet").textContent = (ammusOsui ? "Ammus osui, hävisit!" : "Jäit kiinni!") + " Pisteet: " + pisteet;
+        pelaaja.position.set(0, 0.5, 0);
+        pelaaja.userData.vy = 0;
+        for (const l of luodit) maailma.remove(l.mesh);   // luodit pois
+        luodit.length = 0;
+        for (const v of viholliset) {
+          if (v.position.distanceTo(pelaaja.position) < 15) siirraViholliseenKauas(v);
+        }
+      }
+
+      // Tähti pyörii ja leijuu
+      tahti.rotation.y += 0.03;
+      tahti.position.y = tahtiKorkeus + Math.sin(Date.now() / 300) * 0.2;
+
+      // Osuiko tähteen?
+      if (pelaaja.position.distanceTo(tahti.position) < 1.5) {
+        const arvo = timantinArvo();            // mitä enemmän lisättyjä vastustajia, sitä enemmän pisteitä
+        pisteet += arvo;
+        lisaaHantaPala(tahtiVari);              // häntä kasvaa tähden värillä
+        lisaaPankkiin(arvo);                    // pisteet tallentuvat pankkiin
+        document.getElementById("pisteet").textContent = "Pisteet: " + pisteet;
+        uusiTahti();
+      }
+
+      // Kamera pelaajan ympärillä
+      kamera.position.set(
+        pelaaja.position.x + etaisyys * Math.sin(kulmaV) * Math.cos(kulmaP),
+        etaisyys * Math.sin(kulmaP),
+        pelaaja.position.z + etaisyys * Math.cos(kulmaV) * Math.cos(kulmaP)
+      );
+      kamera.lookAt(pelaaja.position);
+    }
+
+    function silmukka() {
+      paivita();
+      if (sateenkaari) pelaaja.material.color.setHSL((Date.now() / 1500) % 1, 0.9, 0.55);   // sateenkaarikuutio
+
+      piirtaja.render(maailma, kamera);
+      requestAnimationFrame(silmukka);
+    }
+    silmukka();
+
+    addEventListener("resize", () => {
+      kamera.aspect = innerWidth / innerHeight;
+      kamera.updateProjectionMatrix();
+      piirtaja.setSize(innerWidth, innerHeight);
+    });
+  </script>
+</body>
+</html>
