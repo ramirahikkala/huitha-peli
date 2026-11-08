@@ -75,6 +75,26 @@
     .tuote { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
     .nayte { width: 26px; height: 26px; border: 2px solid white; border-radius: 4px; flex: none; }
     .tuote span { flex: 1; font-size: 14px; }
+
+    /* Kauppa rullattavaksi: lista ei mene ruudun ulkopuolelle, vaan sitä voi vierittää sormella */
+    #pankki { z-index: 10; }
+    #kauppa {
+      max-height: calc(100vh - 150px);
+      max-height: calc(100dvh - 150px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+    }
+
+    .kosketustila #ohje, .kosketustila .nappiohje { display: none; }
+
+    /* Kosketusnäytöllä ohjetekstit pois ja isommat napit */
+    @media (any-pointer: coarse) {
+      #ohje, .nappiohje { display: none; }
+      .kauppaNappi { padding: 9px 14px; font-size: 15px; }
+      .tuote { margin: 9px 0; }
+    }
   </style>
 </head>
 <body>
@@ -83,10 +103,10 @@
     <div id="lukko" style="font-size:14px"></div>
     <div id="vastustajat" style="font-size:14px"></div>
     <div style="pointer-events:auto; margin-top:4px">
-      <button id="lisaaVihu" class="kauppaNappi">➕ Lisää vastustaja (V)</button>
-      <button id="poistaVihu" class="kauppaNappi">➖ Poista (B)</button>
+      <button id="lisaaVihu" class="kauppaNappi">➕ Lisää vastustaja<span class="nappiohje"> (V)</span></button>
+      <button id="poistaVihu" class="kauppaNappi">➖ Poista<span class="nappiohje"> (B)</span></button>
     </div>
-    <div style="font-size:14px">E S D F liikuttavat (E eteen, D taakse, S vasen, F oikea) · välilyönti hyppää · vedä hiirellä kääntääksesi kameraa · rulla zoomaa · L lukitsee kuvakulman<br>Punaiset kuutiot jahtaavat (oranssi ampuu, isot hyppäävät korkealle) – häntä kasvaa pisteistä, mutta viholliset voivat katkaista sen! Piiloudu tunneliin tai palikan taakse!</div>
+    <div id="ohje" style="font-size:14px">E S D F liikuttavat (E eteen, D taakse, S vasen, F oikea) · välilyönti hyppää · vedä hiirellä kääntääksesi kameraa · rulla zoomaa · L lukitsee kuvakulman<br>Punaiset kuutiot jahtaavat (oranssi ampuu, isot hyppäävät korkealle) – häntä kasvaa pisteistä, mutta viholliset voivat katkaista sen! Piiloudu tunneliin tai palikan taakse!</div>
   </div>
 
   <!-- Pankki: kerätyt pisteet tallentuvat tänne -->
@@ -652,7 +672,10 @@
       document.getElementById("lukkoNappi").addEventListener("click", vaihdaLukitus);
 
       // Ohjaimet näkyvät kosketusnäytöllä (tai osoitteella ...?kosketus kokeilua varten)
-      if (location.search.includes("kosketus")) document.getElementById("kosketus").style.display = "block";
+      if (location.search.includes("kosketus")) {
+        document.getElementById("kosketus").style.display = "block";
+        document.body.classList.add("kosketustila");     // sama ulkoasu kuin kosketusnäytöllä
+      }
     }
 
     // --- Pankki ja kauppa ---
