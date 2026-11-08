@@ -841,7 +841,12 @@
       { nimi: "Sini-valkoinen",    tyyppi: "kaksivari", hinta: 30, varit: [0x2f80ff, 0xffffff] },
       { nimi: "Pinkki-turkoosi",   tyyppi: "kaksivari", hinta: 30, varit: [0xff5fbf, 0x1de9d6] },
       { nimi: "Oranssi-keltainen", tyyppi: "kaksivari", hinta: 30, varit: [0xff8c1a, 0xffd700] },
-      { nimi: "Musta-valkoinen",   tyyppi: "kaksivari", hinta: 30, varit: [0x222222, 0xffffff] }
+      { nimi: "Musta-valkoinen",   tyyppi: "kaksivari", hinta: 30, varit: [0x222222, 0xffffff] },
+      // Aavikkopelaajat
+      { nimi: "Hiekka",            vari: 0xe6c27a },                                              // 10
+      { nimi: "Terrakotta",        vari: 0xc8643c },                                              // 10
+      { nimi: "Hiekka-terrakotta", tyyppi: "kaksivari", hinta: 30, varit: [0xe6c27a, 0xc8643c] },
+      { nimi: "Kaktus",            tyyppi: "kaktus", hinta: 60, vari: 0x3ea34a }                  // kukkiva kaktus
     ];
 
     // Tallennus selaimen muistiin (säilyy, kun sivun lataa uudelleen)
@@ -930,6 +935,54 @@
       } else if (k.tyyppi === "sateenkaari") {
         pelaaja.material = new THREE.MeshLambertMaterial({ color: 0xff0000 });
         sateenkaari = true;
+      } else if (k.tyyppi === "kaktus") {
+        // Kaktus: vihreä runko, kaksi kättä, valkoiset piikit ja pinkki kukka päällä
+        pelaaja.material = new THREE.MeshBasicMaterial({ visible: false });
+        const vihrea = new THREE.MeshLambertMaterial({ color: 0x3ea34a });
+        const ryhma = new THREE.Group();
+
+        const runko = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.4, 0.75, 18), vihrea);
+        runko.position.y = -0.125;                                   // pohja samalle tasolle kuin kuutiolla
+        const paa = new THREE.Mesh(new THREE.SphereGeometry(0.38, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), vihrea);
+        paa.position.y = 0.25;                                       // pyöreä yläosa
+        ryhma.add(runko, paa);
+
+        for (const puoli of [-1, 1]) {                               // kädet
+          const vaaka = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.22, 12), vihrea);
+          vaaka.rotation.z = Math.PI / 2;
+          vaaka.position.set(0.44 * puoli, -0.05, 0);
+          const pysty = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.35, 12), vihrea);
+          pysty.position.set(0.55 * puoli, 0.12, 0);
+          const karki = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 8), vihrea);
+          karki.position.set(0.55 * puoli, 0.295, 0);
+          ryhma.add(vaaka, pysty, karki);
+        }
+
+        const piikkiMateriaali = new THREE.MeshLambertMaterial({ color: 0xfff3c0 });
+        const ylos = new THREE.Vector3(0, 1, 0);
+        for (const y of [-0.35, -0.1, 0.15]) {                       // piikit riveissä rungon ympärillä
+          for (let n = 0; n < 8; n++) {
+            const kulma = n / 8 * Math.PI * 2 + (y > -0.2 ? 0.4 : 0);
+            const ulos = new THREE.Vector3(Math.cos(kulma), 0, Math.sin(kulma));
+            const piikki = new THREE.Mesh(new THREE.ConeGeometry(0.025, 0.12, 5), piikkiMateriaali);
+            piikki.position.set(ulos.x * 0.4, y, ulos.z * 0.4);
+            piikki.quaternion.setFromUnitVectors(ylos, ulos);
+            ryhma.add(piikki);
+          }
+        }
+
+        const kukkaMateriaali = new THREE.MeshLambertMaterial({ color: 0xff5fbf });   // kukka päällä
+        for (let n = 0; n < 5; n++) {
+          const kulma = n / 5 * Math.PI * 2;
+          const terava = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), kukkaMateriaali);
+          terava.position.set(Math.cos(kulma) * 0.1, 0.63, Math.sin(kulma) * 0.1);
+          ryhma.add(terava);
+        }
+        const keskus = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), new THREE.MeshLambertMaterial({ color: 0xffd700 }));
+        keskus.position.y = 0.65;
+        ryhma.add(keskus);
+
+        pelaaja.add(ryhma);
       } else if (k.tyyppi === "kaksivari") {
         // kuution kuusi sivua vuorotellen kahdella värillä
         const [a, b] = k.varit;
