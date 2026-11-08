@@ -995,7 +995,7 @@
       { nimi: "Sammal",            vari: 0x5a8f3d },                                              // 10
       { nimi: "Kaarna",            vari: 0x6b4423 },                                              // 10
       { nimi: "Sammal-kaarna",     tyyppi: "kaksivari", hinta: 30, varit: [0x5a8f3d, 0x6b4423] },
-      { nimi: "Kuusi",             tyyppi: "kuusi", hinta: 60, vari: 0x2f7d3a },                  // joulukuusi tähdellä
+      { nimi: "Kuusi",             tyyppi: "kuusi", hinta: 60, vari: 0x2f7d3a },                  // tavallinen kuusi
       { nimi: "Sieni",             tyyppi: "sieni", hinta: 60, vari: 0xd93a3a,
         tahtivarit: [0xf5deb3, 0xff9ecb, 0xffffff] },                                              // punahilkka, valkoisin täplin
       // Monumenttipelaajat
@@ -1156,7 +1156,6 @@
           osa(new THREE.ConeGeometry(0.5, 0.45, 12), 0x2f7d3a, 0, -0.18, 0);                  // oksat alhaalta ylös
           osa(new THREE.ConeGeometry(0.4, 0.42, 12), 0x3a9148, 0, 0.1, 0);
           osa(new THREE.ConeGeometry(0.28, 0.4, 12), 0x48a85a, 0, 0.37, 0);
-          osa(new THREE.SphereGeometry(0.06, 8, 6), 0xffd700, 0, 0.6, 0);                     // tähti latvassa
         } else if (k.tyyppi === "sieni") {
           osa(new THREE.CylinderGeometry(0.2, 0.24, 0.55, 14), 0xf5e6c8, 0, -0.225, 0);       // jalka
           const hattu = osa(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), 0xd93a3a, 0, 0, 0);
