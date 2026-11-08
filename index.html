@@ -76,6 +76,31 @@
     .nayte { width: 26px; height: 26px; border: 2px solid white; border-radius: 4px; flex: none; }
     .tuote span { flex: 1; font-size: 14px; }
 
+    /* Maps-nappi: kiinni ruudun vasemmassa reunassa, keskellä */
+    #karttaNappi {
+      position: fixed; left: 0; top: 50%; transform: translateY(-50%); z-index: 6;
+      border-left: none; border-radius: 0 12px 12px 0; padding: 14px 10px; font-size: 15px;
+    }
+
+    /* Maps-ikkuna */
+    #kartat {
+      display: none; position: fixed; inset: 0; z-index: 20;
+      background: rgba(0,0,0,0.6); align-items: center; justify-content: center;
+    }
+    #kartat.auki { display: flex; }
+    #kartatLaatikko {
+      width: min(420px, 92vw); max-height: 85vh; max-height: 85dvh; overflow-y: auto;
+      overscroll-behavior: contain; touch-action: pan-y;
+      background: rgba(30, 10, 60, 0.97); border: 2px solid white; border-radius: 12px;
+      padding: 12px; color: white; font-size: 18px;
+    }
+    .karttaotsikko { display: flex; justify-content: space-between; align-items: center; }
+    .kartta { margin: 10px 0; padding: 8px; border: 2px solid rgba(255,255,255,0.4); border-radius: 10px; }
+    .kartta.valittu { border-color: #2ecc40; }
+    .kartta canvas { width: 100%; display: block; border-radius: 6px; }
+    .karttarivi { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 16px; }
+    .karttarivi small { font-size: 12px; opacity: 0.85; }
+
     /* Kauppa rullattavaksi: lista ei mene ruudun ulkopuolelle, vaan sitä voi vierittää sormella */
     #pankki { z-index: 10; }
     #kauppa {
@@ -104,8 +129,7 @@
     <div id="vastustajat" style="font-size:14px"></div>
     <div style="pointer-events:auto; margin-top:4px">
       <button id="lisaaVihu" class="kauppaNappi">➕ Lisää vastustaja<span class="nappiohje"> (V)</span></button>
-      <button id="poistaVihu" class="kauppaNappi">➖ Poista<span class="nappiohje"> (B)</span></button>
-    </div>
+      <button id="poistaVihu" class="kauppaNappi">➖ Poista<span class="nappiohje"> (B)</span></button>    </div>
     <div id="ohje" style="font-size:14px">E S D F liikuttavat (E eteen, D taakse, S vasen, F oikea) · välilyönti hyppää · vedä hiirellä kääntääksesi kameraa · rulla zoomaa · L lukitsee kuvakulman<br>Punaiset kuutiot jahtaavat (oranssi ampuu, isot hyppäävät korkealle) – häntä kasvaa pisteistä, mutta viholliset voivat katkaista sen! Piiloudu tunneliin tai palikan taakse!</div>
   </div>
 
@@ -126,6 +150,17 @@
     <div id="kauppa"></div>
   </div>
 
+  <!-- Maps-nappi vasemmassa reunassa -->
+  <button id="karttaNappi" class="kauppaNappi">🗺️ Maps</button>
+
+  <!-- Maps: kenttien valinta -->
+  <div id="kartat">
+    <div id="kartatLaatikko">
+      <div class="karttaotsikko"><b>🗺️ Maps</b> <button id="kartatSulje" class="kauppaNappi">✕</button></div>
+      <div id="kartatLista"></div>
+    </div>
+  </div>
+
   <!-- Kosketusohjaimet -->
   <div id="kosketus">
     <div id="ohjainPohja"><div id="ohjainNuppi"></div></div>
@@ -137,8 +172,110 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
     // --- Maailma ---
+    // --- Kentät: kenttä valitaan 🗺️-napilla ja muistetaan selaimessa ---
+    const KARTAT = [
+      {
+        nimi: "Niitty",
+        taivas: 0x6ec6ff, maa: 0x7be0a4, viivat: 0xffffff, valo: 0xffffff,
+        sumu: [50, 160],
+        koko: 135, palikoita: 200, tunneleita: 50,
+        korkeus: [1, 6],                                                   // palikoiden korkeus
+        vari: () => new THREE.Color().setHSL(Math.random(), 0.6, 0.6)      // palikoiden värit: kaikki värit
+      },
+      {
+        nimi: "Aavikko",
+        taivas: 0xffd9a0, maa: 0xe6c27a, viivat: 0xc9a25a, valo: 0xfff0d0,
+        sumu: [35, 120],                                                   // pölyisempi ilma
+        koko: 110, palikoita: 110, tunneleita: 75,                         // pienempi, enemmän tunneleita
+        korkeus: [1.5, 9],                                                 // korkeampia kallioita
+        vari: () => new THREE.Color().setHSL(0.02 + Math.random() * 0.1, 0.55, 0.42 + Math.random() * 0.2)   // maanläheiset värit
+      }
+    ];
+    let karttaNro = 0;
+    try { karttaNro = Number(localStorage.getItem("ellinKartta")) || 0; } catch (e) {}
+    if (!KARTAT[karttaNro]) karttaNro = 0;
+    const KARTTA = KARTAT[karttaNro];
+
+    // --- Maps-nappi: avaa listan kentistä, joissa on pieni esikatselukuva ---
+    const kartatPaneeli = document.getElementById("kartat");
+    const kartatLista = document.getElementById("kartatLista");
+    const cssVari = c => "#" + c.toString(16).padStart(6, "0");
+
+    // Piirtää kentän esikatselun: taivas, maa, ruudukko sekä muutama palikka ja tunneli
+    function piirraEsikatselu(k, kangas) {
+      const g = kangas.getContext("2d");
+      const W = kangas.width, H = kangas.height, hor = H * 0.38;     // hor = horisontti
+      g.fillStyle = cssVari(k.taivas); g.fillRect(0, 0, W, hor);
+      g.fillStyle = cssVari(k.maa);    g.fillRect(0, hor, W, H - hor);
+      g.strokeStyle = cssVari(k.viivat); g.globalAlpha = 0.5; g.lineWidth = 1;
+      for (let i = 1; i <= 6; i++) {                                  // ruudukko perspektiivissä
+        const y = hor + (H - hor) * Math.pow(i / 6, 1.7);
+        g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke();
+      }
+      for (let i = -4; i <= 12; i++) {
+        g.beginPath(); g.moveTo(W / 2 + (i - 4) * 6, hor); g.lineTo(i * W / 8, H); g.stroke();
+      }
+      g.globalAlpha = 1;
+
+      // Esteet, kaukaisimmat ensin
+      const esteet = [];
+      const palikoita = Math.round(k.palikoita / 18), tunneleita = Math.round(k.tunneleita / 10);
+      for (let i = 0; i < palikoita + tunneleita; i++) {
+        esteet.push({ tunneli: i >= palikoita, x: Math.random() * W, y: hor + 6 + Math.random() * (H - hor - 8) });
+      }
+      esteet.sort((a, b) => a.y - b.y);
+      for (const e of esteet) {
+        const s = 0.35 + (e.y - hor) / (H - hor);                       // lähellä isompi
+        const vari = k.vari().getStyle();
+        if (e.tunneli) {
+          const w = 46 * s, h = 26 * s;
+          g.fillStyle = vari; g.fillRect(e.x - w / 2, e.y - h, w, h);
+          g.fillStyle = "rgba(0,0,0,0.55)"; g.fillRect(e.x - w * 0.3, e.y - h * 0.7, w * 0.6, h * 0.7);   // aukko
+        } else {
+          const w = (10 + Math.random() * 18) * s;
+          const h = (k.korkeus[0] + Math.random() * (k.korkeus[1] - k.korkeus[0])) * 5 * s;
+          g.fillStyle = vari; g.fillRect(e.x - w / 2, e.y - h, w, h);
+          g.fillStyle = "rgba(0,0,0,0.25)"; g.fillRect(e.x + w * 0.15, e.y - h, w * 0.35, h);              // varjopuoli
+        }
+      }
+    }
+
+    function piirraKartat() {
+      kartatLista.innerHTML = "";
+      KARTAT.forEach((k, i) => {
+        const kortti = document.createElement("div");
+        kortti.className = "kartta" + (i === karttaNro ? " valittu" : "");
+        const kangas = document.createElement("canvas");
+        kangas.width = 360; kangas.height = 170;
+        piirraEsikatselu(k, kangas);
+        const rivi = document.createElement("div");
+        rivi.className = "karttarivi";
+        rivi.innerHTML = "<span><b>" + k.nimi + "</b><br><small>Koko " + k.koko + " · palikoita " + k.palikoita +
+          " · tunneleita " + k.tunneleita + "</small></span>";
+        const nappi = document.createElement("button");
+        nappi.className = "kauppaNappi";
+        nappi.textContent = i === karttaNro ? "Käytössä" : "Pelaa tässä";
+        nappi.disabled = i === karttaNro;
+        nappi.addEventListener("click", () => {
+          try { localStorage.setItem("ellinKartta", String(i)); } catch (e) {}
+          location.reload();     // kenttä rakennetaan uudelleen (pankki säilyy)
+        });
+        rivi.appendChild(nappi);
+        kortti.append(kangas, rivi);
+        kartatLista.appendChild(kortti);
+      });
+    }
+
+    document.getElementById("karttaNappi").addEventListener("click", e => {
+      piirraKartat();
+      kartatPaneeli.classList.add("auki");
+      e.currentTarget.blur();
+    });
+    document.getElementById("kartatSulje").addEventListener("click", () => kartatPaneeli.classList.remove("auki"));
+    kartatPaneeli.addEventListener("click", e => { if (e.target === kartatPaneeli) kartatPaneeli.classList.remove("auki"); });
+
     const maailma = new THREE.Scene();
-    maailma.background = new THREE.Color(0x6ec6ff);   // taivaan väri
+    maailma.background = new THREE.Color(KARTTA.taivas);   // taivaan väri
 
     const kamera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 400);
     const piirtaja = new THREE.WebGLRenderer({ antialias: true });
@@ -147,20 +284,20 @@
 
     // Valot
     maailma.add(new THREE.AmbientLight(0xffffff, 0.6));
-    const aurinko = new THREE.DirectionalLight(0xffffff, 0.8);
+    const aurinko = new THREE.DirectionalLight(KARTTA.valo, 0.8);
     aurinko.position.set(5, 10, 5);
     maailma.add(aurinko);
 
     // --- Kenttä ---
-    const KENTTA = 135;  // kentän koko (kokeile isompaa tai pienempää!)
-    maailma.fog = new THREE.Fog(0x6ec6ff, 50, 160);   // kaukana olevat himmenevät
+    const KENTTA = KARTTA.koko;  // kentän koko (kokeile isompaa tai pienempää!)
+    maailma.fog = new THREE.Fog(KARTTA.taivas, KARTTA.sumu[0], KARTTA.sumu[1]);   // kaukana olevat himmenevät
     const maa = new THREE.Mesh(
       new THREE.PlaneGeometry(KENTTA, KENTTA),
-      new THREE.MeshLambertMaterial({ color: 0x7be0a4 })   // maan väri
+      new THREE.MeshLambertMaterial({ color: KARTTA.maa })   // maan väri
     );
     maa.rotation.x = -Math.PI / 2;
     maailma.add(maa);
-    maailma.add(new THREE.GridHelper(KENTTA, KENTTA, 0xffffff, 0xffffff));
+    maailma.add(new THREE.GridHelper(KENTTA, KENTTA, KARTTA.viivat, KARTTA.viivat));
 
     // --- Pelaaja (violetti kuutio) ---
     const pelaaja = new THREE.Mesh(
@@ -175,11 +312,11 @@
     const esteet = [];                       // törmäyslaatikot
     const tunnelit = [];                     // tunneleiden alueet (vihollinen ei näe sinne)
     const alueet = [{ x: 0, z: 0, r: 5 }];   // varatut paikat (alussa vapaa tila pelaajalle)
-    const PALIKOITA = 200;                  // montako palikkaa
-    const TUNNELEITA = 50;                  // montako tunnelia
+    const PALIKOITA = KARTTA.palikoita;                  // montako palikkaa
+    const TUNNELEITA = KARTTA.tunneleita;                  // montako tunnelia
 
     function satunnainen(a, b) { return a + Math.random() * (b - a); }
-    function satunnaisVari() { return new THREE.Color().setHSL(Math.random(), 0.6, 0.6); }
+    function satunnaisVari() { return KARTTA.vari(); }
 
     // Yksi laatikko: keskipiste (x, z), alareuna y0, koot sx/sy/sz
     function laatikko(x, y0, z, sx, sy, sz, vari, tormaa) {
@@ -202,7 +339,7 @@
     }
 
     function teePalikka() {
-      const sx = satunnainen(1, 5), sy = satunnainen(1, 6), sz = satunnainen(1, 5);
+      const sx = satunnainen(1, 5), sy = satunnainen(KARTTA.korkeus[0], KARTTA.korkeus[1]), sz = satunnainen(1, 5);
       const r = Math.hypot(sx, sz) / 2;
       for (let i = 0; i < 50; i++) {
         const x = satunnainen(-KENTTA / 2, KENTTA / 2), z = satunnainen(-KENTTA / 2, KENTTA / 2);
