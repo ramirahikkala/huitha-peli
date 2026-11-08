@@ -189,8 +189,35 @@
         koko: 110, palikoita: 110, tunneleita: 75,                         // pienempi, enemmän tunneleita
         korkeus: [1.5, 9],                                                 // korkeampia kallioita
         vari: () => new THREE.Color().setHSL(0.02 + Math.random() * 0.1, 0.55, 0.42 + Math.random() * 0.2)   // maanläheiset värit
+      },
+      {
+        nimi: "Metsä",
+        taivas: 0x9ccfc0, maa: 0x3f8f4e, viivat: 0x2f6e3b, valo: 0xe8ffe0,
+        sumu: [25, 100],                                                   // sumuinen metsä
+        koko: 130, palikoita: 280, tunneleita: 45,                         // paljon puita, pensaita ja kiviä
+        korkeus: [0.8, 1.4],
+        maisema: { puu: 5.5, pensas: 2.5, kivi: 2 },                       // rakennelmien suhteet
+        vari: () => new THREE.Color().setHSL(0.3 + Math.random() * 0.06, 0.5, 0.28 + Math.random() * 0.12),
+        tunnelivari: () => new THREE.Color().setHSL(0.07 + Math.random() * 0.03, 0.45, 0.28 + Math.random() * 0.1)   // puutunneleita
+      },
+      {
+        nimi: "Monumentit",
+        taivas: 0x8fc6f0, maa: 0xd9c08c, viivat: 0xb39a64, valo: 0xfff4d8,
+        sumu: [45, 150],
+        koko: 135, palikoita: 70, tunneleita: 28,                          // isoja rakennelmia, vähemmän niitä
+        korkeus: [1, 3],
+        maisema: { pyramidi: 4, sfinksi: 1.5, obeliski: 3 },
+        vari: () => new THREE.Color().setHSL(0.1 + Math.random() * 0.04, 0.4 + Math.random() * 0.2, 0.55 + Math.random() * 0.18)   // hiekkakiveä
       }
     ];
+
+    // Arpoo rakennelman tyypin kentän "maisema"-painojen mukaan (esim. { puu: 5.5, pensas: 2.5 })
+    function painotettuNimi(maisema) {
+      const m = maisema || { palikka: 1 };
+      let r = Math.random() * Object.values(m).reduce((a, b) => a + b, 0);
+      for (const [nimi, paino] of Object.entries(m)) { r -= paino; if (r <= 0) return nimi; }
+      return "palikka";
+    }
     let karttaNro = 0;
     try { karttaNro = Number(localStorage.getItem("ellinKartta")) || 0; } catch (e) {}
     if (!KARTAT[karttaNro]) karttaNro = 0;
@@ -200,6 +227,32 @@
     const kartatPaneeli = document.getElementById("kartat");
     const kartatLista = document.getElementById("kartatLista");
     const cssVari = c => "#" + c.toString(16).padStart(6, "0");
+
+    // Piirtää esikatseluun yhden rakennelman (puu, pyramidi ...)
+    function piirraMuoto(g, e, s) {
+      const x = e.x, y = e.y;
+      const kolmio = (x1, y1, x2, y2, x3, y3, vari) => {
+        g.fillStyle = vari; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x3, y3); g.closePath(); g.fill();
+      };
+      if (e.muoto === "puu") {
+        g.fillStyle = "#6b4423"; g.fillRect(x - 2 * s, y - 14 * s, 4 * s, 14 * s);
+        kolmio(x - 13 * s, y - 10 * s, x + 13 * s, y - 10 * s, x, y - 40 * s, "#2f7d3a");
+      } else if (e.muoto === "pensas") {
+        g.fillStyle = "#3d7d34"; g.fillRect(x - 11 * s, y - 9 * s, 22 * s, 9 * s);
+      } else if (e.muoto === "kivi") {
+        g.fillStyle = "#8a8a8a"; g.fillRect(x - 9 * s, y - 10 * s, 18 * s, 10 * s);
+      } else if (e.muoto === "pyramidi") {
+        kolmio(x - 28 * s, y, x + 28 * s, y, x, y - 36 * s, "#cfa65a");
+        kolmio(x, y - 36 * s, x + 28 * s, y, x, y, "#a98543");
+      } else if (e.muoto === "sfinksi") {
+        g.fillStyle = "#d9b36a"; g.fillRect(x - 20 * s, y - 13 * s, 40 * s, 13 * s);
+        g.fillRect(x + 12 * s, y - 24 * s, 11 * s, 12 * s);
+        g.fillStyle = "#e8c34a"; g.fillRect(x + 10 * s, y - 25 * s, 4 * s, 14 * s);
+      } else if (e.muoto === "obeliski") {
+        g.fillStyle = "#c9a86a"; g.fillRect(x - 3.5 * s, y - 50 * s, 7 * s, 50 * s);
+        kolmio(x - 3.5 * s, y - 50 * s, x + 3.5 * s, y - 50 * s, x, y - 57 * s, "#e8c34a");
+      }
+    }
 
     // Piirtää kentän esikatselun: taivas, maa, ruudukko sekä muutama palikka ja tunneli
     function piirraEsikatselu(k, kangas) {
@@ -219,9 +272,9 @@
 
       // Esteet, kaukaisimmat ensin
       const esteet = [];
-      const palikoita = Math.round(k.palikoita / 18), tunneleita = Math.round(k.tunneleita / 10);
+      const palikoita = Math.max(6, Math.round(k.palikoita / 18)), tunneleita = Math.round(k.tunneleita / 10);
       for (let i = 0; i < palikoita + tunneleita; i++) {
-        esteet.push({ tunneli: i >= palikoita, x: Math.random() * W, y: hor + 6 + Math.random() * (H - hor - 8) });
+        esteet.push({ tunneli: i >= palikoita, muoto: painotettuNimi(k.maisema), x: Math.random() * W, y: hor + 6 + Math.random() * (H - hor - 8) });
       }
       esteet.sort((a, b) => a.y - b.y);
       for (const e of esteet) {
@@ -231,6 +284,8 @@
           const w = 46 * s, h = 26 * s;
           g.fillStyle = vari; g.fillRect(e.x - w / 2, e.y - h, w, h);
           g.fillStyle = "rgba(0,0,0,0.55)"; g.fillRect(e.x - w * 0.3, e.y - h * 0.7, w * 0.6, h * 0.7);   // aukko
+        } else if (e.muoto !== "palikka") {
+          piirraMuoto(g, e, s);
         } else {
           const w = (10 + Math.random() * 18) * s;
           const h = (k.korkeus[0] + Math.random() * (k.korkeus[1] - k.korkeus[0])) * 5 * s;
@@ -319,7 +374,7 @@
     function satunnaisVari() { return KARTTA.vari(); }
 
     // Yksi laatikko: keskipiste (x, z), alareuna y0, koot sx/sy/sz
-    function laatikko(x, y0, z, sx, sy, sz, vari, tormaa) {
+    function laatikko(x, y0, z, sx, sy, sz, vari, tormaa, porras) {
       const m = new THREE.Mesh(
         new THREE.BoxGeometry(sx, sy, sz),
         new THREE.MeshLambertMaterial({ color: vari })
@@ -328,7 +383,8 @@
       maailma.add(m);
       if (tormaa) esteet.push({
         x1: x - sx / 2, x2: x + sx / 2, z1: z - sz / 2, z2: z + sz / 2,
-        y1: y0, y2: y0 + sy      // alareuna ja yläreuna
+        y1: y0, y2: y0 + sy,     // alareuna ja yläreuna
+        porras: !!porras         // porras = portaan askelma: sille voi kiivetä, vaikka päällä olisi toinen askelma
       });
     }
 
@@ -362,7 +418,7 @@
       for (let i = 0; i < 50; i++) {
         const x = satunnainen(-KENTTA / 2, KENTTA / 2), z = satunnainen(-KENTTA / 2, KENTTA / 2);
         if (!vapaa(x, z, r)) continue;
-        const vari = satunnaisVari();
+        const vari = (KARTTA.tunnelivari || KARTTA.vari)();     // tunneleilla voi olla oma värinsä
         const d = aukko / 2 + paksuus / 2;
         if (pitkaZ) {
           laatikko(x - d, 0, z, paksuus, korkeus, pituus, vari, true);   // seinät
@@ -381,7 +437,95 @@
     }
 
     for (let i = 0; i < TUNNELEITA; i++) teeTunneli();
-    for (let i = 0; i < PALIKOITA; i++) teePalikka();
+    // --- Kentän aiheen mukaiset rakennelmat (puut, pyramidit, sfinksit ...) ---
+    const hslVari = (h, s, l) => new THREE.Color().setHSL(h, s, l);
+
+    // Etsii vapaan paikan (säde r) ja rakentaa siihen
+    function sijoita(r, rakenna) {
+      for (let i = 0; i < 50; i++) {
+        const x = satunnainen(-KENTTA / 2, KENTTA / 2), z = satunnainen(-KENTTA / 2, KENTTA / 2);
+        if (vapaa(x, z, r)) { rakenna(x, z); alueet.push({ x, z, r }); return; }
+      }
+    }
+
+    // Koriste: näkyy, mutta siihen ei voi törmätä
+    function koriste(geometria, vari, x, y, z, lapinakyva) {
+      const materiaali = new THREE.MeshLambertMaterial({ color: vari });
+      if (lapinakyva) { materiaali.transparent = true; materiaali.opacity = 0.6; materiaali.depthWrite = false; }
+      const m = new THREE.Mesh(geometria, materiaali);
+      m.position.set(x, y, z);
+      maailma.add(m);
+      return m;
+    }
+
+    function teePuu() {
+      const h = satunnainen(2.5, 4.5);
+      sijoita(0.9, (x, z) => {
+        laatikko(x, 0, z, 0.9, h, 0.9, 0x6b4423, true);                                   // runko
+        const lehvasto = hslVari(0.3 + Math.random() * 0.05, 0.5, 0.25 + Math.random() * 0.12);
+        koriste(new THREE.ConeGeometry(satunnainen(1.4, 2.1), 3.2, 8), lehvasto, x, h + 1.0, z, true);   // läpinäkyvä latva, ettei peitä pelaajaa
+      });
+    }
+
+    function teePensas() {
+      const sx = satunnainen(1.5, 3), sz = satunnainen(1.5, 3), sy = satunnainen(0.8, 1.4);
+      sijoita(Math.hypot(sx, sz) / 2, (x, z) => {
+        laatikko(x, 0, z, sx, sy, sz, hslVari(0.3 + Math.random() * 0.06, 0.55, 0.3 + Math.random() * 0.1), true);
+      });
+    }
+
+    function teeKivi() {
+      const sx = satunnainen(1, 3.5), sz = satunnainen(1, 3.5), sy = satunnainen(0.8, 2.2);
+      sijoita(Math.hypot(sx, sz) / 2, (x, z) => {
+        laatikko(x, 0, z, sx, sy, sz, hslVari(0, 0, 0.45 + Math.random() * 0.2), true);
+      });
+    }
+
+    // Porraspyramidi: askelmat ovat 1 korkeita, joten sen päälle voi kiivetä hyppimällä
+    function teePyramidi() {
+      const kanta = satunnainen(8, 14), n = 4 + Math.floor(Math.random() * 3);
+      const askel = kanta / (2 * n);
+      sijoita(kanta * 0.71, (x, z) => {
+        for (let i = 0; i < n; i++) {
+          const leveys = kanta - 2 * askel * i;
+          const vari = i === n - 1 ? 0xe8c34a : hslVari(0.11, 0.5, 0.5 + 0.05 * (i % 2));   // huipulla kultaa
+          laatikko(x, i, z, leveys, 1, leveys, vari, true, true);
+        }
+      });
+    }
+
+    // Sfinksi: vartalo, tassut, pää ja kultainen päähine
+    function teeSfinksi() {
+      const pitkaZ = Math.random() < 0.5;
+      sijoita(5.5, (x, z) => {
+        const osa = (l, w, sl, sw, sy, y0, vari, porras) => pitkaZ
+          ? laatikko(x + w, y0, z + l, sw, sy, sl, vari, true, porras)
+          : laatikko(x + l, y0, z + w, sl, sy, sw, vari, true, porras);
+        const kivi = hslVari(0.11, 0.45, 0.6), tumma = hslVari(0.11, 0.45, 0.5);
+        osa(-0.5, 0, 7, 3, 2, 0, kivi, true);          // vartalo
+        osa(4.2, -1.1, 3, 0.9, 0.9, 0, tumma);         // etutassut
+        osa(4.2, 1.1, 3, 0.9, 0.9, 0, tumma);
+        osa(3.0, 0, 2.2, 2.2, 1.8, 2, kivi, true);     // pää
+        osa(3.0, 0, 1.4, 1.4, 0.5, 3.8, 0xe8c34a);     // kultainen päähine
+      });
+    }
+
+    function teeObeliski() {
+      const h = satunnainen(7, 13);
+      sijoita(1.6, (x, z) => {
+        const kivi = hslVari(0.1, 0.4, 0.62);
+        laatikko(x, 0, z, 2.4, 0.8, 2.4, kivi, true, true);                // jalusta
+        laatikko(x, 0.8, z, 1.4, h, 1.4, kivi, true);                      // pylväs
+        const kärki = koriste(new THREE.ConeGeometry(1.0, 1.6, 4), 0xe8c34a, x, 0.8 + h + 0.8, z);
+        kärki.rotation.y = Math.PI / 4;                                    // kärki samaan asentoon pylvään kanssa
+      });
+    }
+
+    const MUODOT = {
+      palikka: teePalikka, puu: teePuu, pensas: teePensas, kivi: teeKivi,
+      pyramidi: teePyramidi, sfinksi: teeSfinksi, obeliski: teeObeliski
+    };
+    for (let i = 0; i < PALIKOITA; i++) MUODOT[painotettuNimi(KARTTA.maisema)]();
 
     // Osuuko kuutio esteeseen? x, z = paikka, p = puolikas leveys,
     // y = keskikorkeus, k = puolikas korkeus
@@ -451,7 +595,7 @@
       const peitetty = e => esteet.some(f => f !== e &&
         f.x1 < e.x2 && f.x2 > e.x1 && f.z1 < e.z2 && f.z2 > e.z1 &&
         f.y1 <= e.y2 + 0.01 && f.y2 > e.y2 + 0.01);
-      const ehdokkaat = esteet.filter(e => !peitetty(e));
+      const ehdokkaat = esteet.filter(e => e.porras || !peitetty(e));   // portaan askelmat kelpaavat välietappeina
       const vali = (a, b) => Math.hypot(
         Math.max(0, a.x1 - b.x2, b.x1 - a.x2),
         Math.max(0, a.z1 - b.z2, b.z1 - a.z2)
@@ -467,7 +611,7 @@
           }
         }
       }
-      pinnat.push(...paasee);
+      pinnat.push(...[...paasee].filter(e => !peitetty(e)));              // tähti vain avoimelle yläpinnalle
     }
 
     // Tähtien värit (sama väri tulee hännän palaan, kun tähden kerää)
@@ -846,7 +990,20 @@
       { nimi: "Hiekka",            vari: 0xe6c27a },                                              // 10
       { nimi: "Terrakotta",        vari: 0xc8643c },                                              // 10
       { nimi: "Hiekka-terrakotta", tyyppi: "kaksivari", hinta: 30, varit: [0xe6c27a, 0xc8643c] },
-      { nimi: "Kaktus",            tyyppi: "kaktus", hinta: 60, vari: 0x3ea34a }                  // kukkiva kaktus
+      { nimi: "Kaktus",            tyyppi: "kaktus", hinta: 60, vari: 0x3ea34a },                 // kukkiva kaktus
+      // Metsäpelaajat
+      { nimi: "Sammal",            vari: 0x5a8f3d },                                              // 10
+      { nimi: "Kaarna",            vari: 0x6b4423 },                                              // 10
+      { nimi: "Sammal-kaarna",     tyyppi: "kaksivari", hinta: 30, varit: [0x5a8f3d, 0x6b4423] },
+      { nimi: "Kuusi",             tyyppi: "kuusi", hinta: 60, vari: 0x2f7d3a },                  // joulukuusi tähdellä
+      { nimi: "Sieni",             tyyppi: "sieni", hinta: 60, vari: 0xd93a3a,
+        tahtivarit: [0xf5deb3, 0xff9ecb, 0xffffff] },                                              // punahilkka, valkoisin täplin
+      // Monumenttipelaajat
+      { nimi: "Kulta",             vari: 0xffd700 },                                              // 10
+      { nimi: "Hiekkakivi",        vari: 0xd9b36a },                                              // 10
+      { nimi: "Turkoosi-kulta",    tyyppi: "kaksivari", hinta: 30, varit: [0x1de9d6, 0xffd700] },
+      { nimi: "Pyramidi",          tyyppi: "pyramidi", hinta: 60, vari: 0xe0b84a },
+      { nimi: "Sfinksi",           tyyppi: "sfinksi", hinta: 110, vari: 0xd9b36a }               // pää, tassut ja päähine
     ];
 
     // Tallennus selaimen muistiin (säilyy, kun sivun lataa uudelleen)
@@ -876,7 +1033,7 @@
       if (k.tyyppi === "monivari" || k.tyyppi === "kaksivari") pohjat = k.varit;   // kuution omat värit
       else if (k.tyyppi === "sateenkaari") return [0xff4040, 0xffa020, 0xffe030, 0x40e060, 0x40a0ff, 0xb060ff];
       else if (k.tyyppi === "mandariini") pohjat = [0xff8a00, 0xff6a00, 0xffa733, 0x3aa83a];
-      else pohjat = [k.vari];
+      else pohjat = k.tahtivarit || [k.vari];
       const tulos = [];
       const vaaleudet = [0.4, 0.55, 0.7, 0.85];
       const savysiirrot = [-0.02, 0.02, -0.01, 0.01];
@@ -982,6 +1139,49 @@
         keskus.position.y = 0.65;
         ryhma.add(keskus);
 
+        pelaaja.add(ryhma);
+      } else if (k.tyyppi === "kuusi" || k.tyyppi === "sieni" || k.tyyppi === "pyramidi" || k.tyyppi === "sfinksi") {
+        // Metsä- ja monumenttipelaajat: näkymätön kuutio + niiden päälle rakennettu hahmo
+        pelaaja.material = new THREE.MeshBasicMaterial({ visible: false });
+        const ryhma = new THREE.Group();
+        const osa = (geom, vari, x, y, z) => {
+          const m = new THREE.Mesh(geom, new THREE.MeshLambertMaterial({ color: vari }));
+          m.position.set(x, y, z);
+          ryhma.add(m);
+          return m;
+        };
+
+        if (k.tyyppi === "kuusi") {
+          osa(new THREE.CylinderGeometry(0.1, 0.13, 0.25, 8), 0x6b4423, 0, -0.38, 0);        // runko
+          osa(new THREE.ConeGeometry(0.5, 0.45, 12), 0x2f7d3a, 0, -0.18, 0);                  // oksat alhaalta ylös
+          osa(new THREE.ConeGeometry(0.4, 0.42, 12), 0x3a9148, 0, 0.1, 0);
+          osa(new THREE.ConeGeometry(0.28, 0.4, 12), 0x48a85a, 0, 0.37, 0);
+          osa(new THREE.SphereGeometry(0.06, 8, 6), 0xffd700, 0, 0.6, 0);                     // tähti latvassa
+        } else if (k.tyyppi === "sieni") {
+          osa(new THREE.CylinderGeometry(0.2, 0.24, 0.55, 14), 0xf5e6c8, 0, -0.225, 0);       // jalka
+          const hattu = osa(new THREE.SphereGeometry(0.5, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2), 0xd93a3a, 0, 0, 0);
+          hattu.scale.set(1, 0.8, 1);                                                          // punainen hattu
+          for (let n = 0; n < 8; n++) {                                                        // valkoiset täplät
+            const a = n * 2.4, p = 0.35 + (n % 3) * 0.3;
+            const tapla = osa(new THREE.SphereGeometry(0.07, 8, 6), 0xffffff,
+              0.505 * Math.sin(p) * Math.cos(a), 0.405 * Math.cos(p), 0.505 * Math.sin(p) * Math.sin(a));
+            tapla.scale.set(1, 0.6, 1);
+          }
+        } else if (k.tyyppi === "pyramidi") {
+          const p = osa(new THREE.ConeGeometry(0.72, 1.0, 4), 0xe0b84a, 0, 0, 0);
+          p.rotation.y = Math.PI / 4;                                                          // sivut suoraan eteen
+        } else {
+          // Sfinksi katsoo ryhmän +z-suuntaan ja kääntyy kulkusuuntaan kuten mandariini
+          osa(new THREE.BoxGeometry(0.6, 0.4, 0.9), 0xd9b36a, 0, -0.3, -0.05);               // vartalo
+          osa(new THREE.BoxGeometry(0.15, 0.15, 0.35), 0xc29a52, -0.17, -0.42, 0.35);         // etutassut
+          osa(new THREE.BoxGeometry(0.15, 0.15, 0.35), 0xc29a52, 0.17, -0.42, 0.35);
+          osa(new THREE.BoxGeometry(0.52, 0.45, 0.2), 0xe8c34a, 0, 0.03, 0.12);               // kultainen päähine
+          osa(new THREE.BoxGeometry(0.34, 0.34, 0.3), 0xd9b36a, 0, 0.05, 0.28);               // kasvot
+          osa(new THREE.BoxGeometry(0.06, 0.06, 0.04), 0x111111, -0.08, 0.1, 0.44);           // silmät
+          osa(new THREE.BoxGeometry(0.06, 0.06, 0.04), 0x111111, 0.08, 0.1, 0.44);
+          ryhma.rotation.y = kulmaV;
+          mandariiniRyhma = ryhma;
+        }
         pelaaja.add(ryhma);
       } else if (k.tyyppi === "kaksivari") {
         // kuution kuusi sivua vuorotellen kahdella värillä
