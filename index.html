@@ -523,8 +523,8 @@
     }
 
     // Temppeli: portaat, pylväät kehässä, katto ja alttari. Sisään voi kävellä ja portaille kiivetä.
-    function teeTemppeli() {
-      sijoita(9.5, (x, z) => {
+    function teeTemppeli(portaat) {
+      sijoita(portaat ? 14.5 : 9.5, (x, z) => {
         const kivi = hslVari(0.12, 0.3, 0.8), tumma = hslVari(0.11, 0.35, 0.68);
         laatikko(x, 0, z, 15, 1, 15, tumma, true, true);                   // alin porras
         laatikko(x, 1, z, 13.5, 1, 13.5, kivi, true, true);                // ylempi porras
@@ -536,6 +536,11 @@
         laatikko(x, 8, z, 9, 1, 9, kivi, true);                            // kattoharjan alaosa
         laatikko(x, 9, z, 4.5, 1, 4.5, 0xe8c34a, true);                    // kultainen huippu
         laatikko(x, 2, z, 2, 1.2, 2, 0xe8c34a, true, true);                // alttari keskellä
+        if (portaat) {                                                     // portaat katolle (+x-sivulla): jokainen askelma 1 korkea
+          for (let i = 1; i <= 7; i++) {
+            laatikko(x + 7 + (7 - i), 0, z, 1, i, 3.5, hslVari(0.11, 0.35, 0.62 + 0.04 * (i % 2)), true, true);
+          }
+        }
       });
     }
 
@@ -543,7 +548,7 @@
       palikka: teePalikka, puu: teePuu, pensas: teePensas, kivi: teeKivi,
       pyramidi: teePyramidi, sfinksi: teeSfinksi, obeliski: teeObeliski
     };
-    for (let i = 0; i < (KARTTA.temppeleita || 0); i++) teeTemppeli();      // isot ensin, jotta niille löytyy tilaa
+    for (let i = 0; i < (KARTTA.temppeleita || 0); i++) teeTemppeli(i === 0);   // ensimmäisessä on portaat katolle      // isot ensin, jotta niille löytyy tilaa
     for (let i = 0; i < PALIKOITA; i++) MUODOT[painotettuNimi(KARTTA.maisema)]();
 
     // Osuuko kuutio esteeseen? x, z = paikka, p = puolikas leveys,
