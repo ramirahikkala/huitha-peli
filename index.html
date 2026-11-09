@@ -138,13 +138,13 @@
     <div id="pankkiTeksti">Pankki: 0 / 50</div>
     <div id="pankkiPalkki">
       <div id="pankkiTaytto"></div>
-      <div class="viiva" style="left:9.09%"></div>
-      <div class="viiva" style="left:27.27%"></div>
-      <div class="viiva" style="left:54.54%"></div>
+      <div class="viiva" style="left:10%"></div>
+      <div class="viiva" style="left:30%"></div>
+      <div class="viiva" style="left:60%"></div>
     </div>
     <div id="pankkiRajat">
-      <span style="left:9.09%">10</span><span style="left:27.27%">30</span>
-      <span style="left:54.54%">60</span><span style="left:100%">110</span>
+      <span style="left:10%">10</span><span style="left:30%">30</span>
+      <span style="left:60%">60</span><span style="left:100%">100</span>
     </div>
     <button id="kauppaNappi">🛒 Kauppa</button>
     <div id="kauppa"></div>
@@ -991,8 +991,8 @@
     // --- Pankki ja kauppa ---
     // Jokainen kerätty tähti tallentuu pankkiin (myös jos häntä katkeaa).
     // Kun pankissa on 50 pistettä, voi ostaa uuden värisen kuution.
-    // Hinnat: tavalliset värit 10, kaksivärisiä 30, monivärisiä 60, mandariini 110 (jos hintaa ei ole, se on 10)
-    const PANKKI_MAX = 110;                  // palkki täyttyy tähän
+    // Hinnat: tavalliset värit 10, kaksivärisiä 30, monivärisiä 60, mandariini 100 (jos hintaa ei ole, se on 10)
+    const PANKKI_MAX = 100;                  // palkki täyttyy tähän
     const hinta = k => k.hinta !== undefined ? k.hinta : 10;
     const KUUTIOT = [
       { nimi: "Violetti",  vari: 0x800080, hinta: 0 },   // alkuperäinen, ilmainen
@@ -1008,8 +1008,8 @@
       { nimi: "Kuusivärinen", tyyppi: "monivari", hinta: 60,
         varit: [0xff5252, 0x2f80ff, 0x2ecc40, 0xffd700, 0xff8c1a, 0xb266ff] },   // jokaisella sivulla oma väri
       { nimi: "Sateenkaari",  tyyppi: "sateenkaari", hinta: 60 },                // väri vaihtuu koko ajan
-      // 110 pistettä: mandariini
-      { nimi: "Mandariini",   tyyppi: "mandariini", hinta: 110 },
+      // 100 pistettä: mandariini
+      { nimi: "Mandariini",   tyyppi: "mandariini", hinta: 100 },
       // 30 pistettä: kaksivärisiä kuutioita
       { nimi: "Sini-valkoinen",    tyyppi: "kaksivari", hinta: 30, varit: [0x2f80ff, 0xffffff] },
       { nimi: "Pinkki-turkoosi",   tyyppi: "kaksivari", hinta: 30, varit: [0xff5fbf, 0x1de9d6] },
@@ -1032,7 +1032,7 @@
       { nimi: "Hiekkakivi",        vari: 0xd9b36a },                                              // 10
       { nimi: "Turkoosi-kulta",    tyyppi: "kaksivari", hinta: 30, varit: [0x1de9d6, 0xffd700] },
       { nimi: "Pyramidi",          tyyppi: "pyramidi", hinta: 60, vari: 0xe0b84a },
-      { nimi: "Sfinksi",           tyyppi: "sfinksi", hinta: 110, vari: 0xd9b36a }               // pää, tassut ja päähine
+      { nimi: "Sfinksi",           tyyppi: "sfinksi", hinta: 100, vari: 0xd9b36a }               // pää, tassut ja päähine
     ];
 
     // Tallennus selaimen muistiin (säilyy, kun sivun lataa uudelleen)
