@@ -207,6 +207,7 @@
         koko: 135, palikoita: 70, tunneleita: 28,                          // isoja rakennelmia, vähemmän niitä
         korkeus: [1, 3],
         maisema: { pyramidi: 4, sfinksi: 1.5, obeliski: 3 },
+        temppeleita: 3,                                                    // aina kolme temppeliä
         vari: () => new THREE.Color().setHSL(0.1 + Math.random() * 0.04, 0.4 + Math.random() * 0.2, 0.55 + Math.random() * 0.18)   // hiekkakiveä
       }
     ];
@@ -521,10 +522,28 @@
       });
     }
 
+    // Temppeli: portaat, pylväät kehässä, katto ja alttari. Sisään voi kävellä ja portaille kiivetä.
+    function teeTemppeli() {
+      sijoita(9.5, (x, z) => {
+        const kivi = hslVari(0.12, 0.3, 0.8), tumma = hslVari(0.11, 0.35, 0.68);
+        laatikko(x, 0, z, 15, 1, 15, tumma, true, true);                   // alin porras
+        laatikko(x, 1, z, 13.5, 1, 13.5, kivi, true, true);                // ylempi porras
+        for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) {
+          if (a === 0 && b === 0) continue;
+          laatikko(x + a * 5.2, 2, z + b * 5.2, 1, 5, 1, kivi, true);      // 8 pylvästä
+        }
+        laatikko(x, 7, z, 13, 1, 13, tumma, true);                         // katto
+        laatikko(x, 8, z, 9, 1, 9, kivi, true);                            // kattoharjan alaosa
+        laatikko(x, 9, z, 4.5, 1, 4.5, 0xe8c34a, true);                    // kultainen huippu
+        laatikko(x, 2, z, 2, 1.2, 2, 0xe8c34a, true, true);                // alttari keskellä
+      });
+    }
+
     const MUODOT = {
       palikka: teePalikka, puu: teePuu, pensas: teePensas, kivi: teeKivi,
       pyramidi: teePyramidi, sfinksi: teeSfinksi, obeliski: teeObeliski
     };
+    for (let i = 0; i < (KARTTA.temppeleita || 0); i++) teeTemppeli();      // isot ensin, jotta niille löytyy tilaa
     for (let i = 0; i < PALIKOITA; i++) MUODOT[painotettuNimi(KARTTA.maisema)]();
 
     // Osuuko kuutio esteeseen? x, z = paikka, p = puolikas leveys,
