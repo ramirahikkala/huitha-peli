@@ -1117,6 +1117,19 @@
       } else if (t === "kaktus") {
         osa(new THREE.CylinderGeometry(0.38, 0.4, 0.75, 14), 0x3ea34a, 0, -0.125, 0);
         osa(new THREE.SphereGeometry(0.38, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), 0x3ea34a, 0, 0.25, 0);
+        const piikkiMat = new THREE.MeshLambertMaterial({ color: 0xfff3c0 });   // valkoiset piikit riveissä
+        const piikkiGeom = new THREE.ConeGeometry(0.025, 0.12, 5);
+        const ylos = new THREE.Vector3(0, 1, 0);
+        for (const y of [-0.35, -0.1, 0.15]) {
+          for (let n = 0; n < 8; n++) {
+            const kulma = n / 8 * Math.PI * 2 + (y > -0.2 ? 0.4 : 0);
+            const ulos = new THREE.Vector3(Math.cos(kulma), 0, Math.sin(kulma));
+            const piikki = new THREE.Mesh(piikkiGeom, piikkiMat);
+            piikki.position.set(ulos.x * 0.4, y, ulos.z * 0.4);
+            piikki.quaternion.setFromUnitVectors(ylos, ulos);
+            ryhma.add(piikki);
+          }
+        }
       } else if (t === "kuusi") {
         osa(new THREE.CylinderGeometry(0.1, 0.13, 0.25, 8), 0x6b4423, 0, -0.38, 0);
         osa(new THREE.ConeGeometry(0.5, 0.9, 12), 0x2f7d3a, 0, 0.0, 0);
