@@ -1041,11 +1041,7 @@
       const tallessa = JSON.parse(localStorage.getItem("ellinPeli"));
       if (tallessa && Array.isArray(tallessa.omistetut)) tila = tallessa;
     } catch (e) {}
-    // Päiväpassi: tänä päivänä kaikki ulkoasut ovat käytettävissä ilmaiseksi (ostoksia ei kirjata)
-    const AVOIN_PAIVA = "2026-11-09";
-    const _nyt = new Date();
-    const kaikkiAvoinna = _nyt.getFullYear() + "-" + String(_nyt.getMonth() + 1).padStart(2, "0") + "-" + String(_nyt.getDate()).padStart(2, "0") === AVOIN_PAIVA;
-    const omistaaUlkoasun = i => kaikkiAvoinna || tila.omistetut.includes(i);
+    const omistaaUlkoasun = i => tila.omistetut.includes(i);
     function tallenna() {
       try { localStorage.setItem("ellinPeli", JSON.stringify(tila)); } catch (e) {}
     }
