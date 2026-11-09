@@ -1012,6 +1012,11 @@
       const tallessa = JSON.parse(localStorage.getItem("ellinPeli"));
       if (tallessa && Array.isArray(tallessa.omistetut)) tila = tallessa;
     } catch (e) {}
+    // Päiväpassi: tänä päivänä kaikki ulkoasut ovat käytettävissä ilmaiseksi (ostoksia ei kirjata)
+    const AVOIN_PAIVA = "2026-11-09";
+    const _nyt = new Date();
+    const kaikkiAvoinna = _nyt.getFullYear() + "-" + String(_nyt.getMonth() + 1).padStart(2, "0") + "-" + String(_nyt.getDate()).padStart(2, "0") === AVOIN_PAIVA;
+    const omistaaUlkoasun = i => kaikkiAvoinna || tila.omistetut.includes(i);
     function tallenna() {
       try { localStorage.setItem("ellinPeli", JSON.stringify(tila)); } catch (e) {}
     }
@@ -1273,7 +1278,7 @@
     const kauppaPaneeli = document.getElementById("kauppa");
 
     function paivitaPankki() {
-      const ostettavaa = KUUTIOT.some((k, i) => !tila.omistetut.includes(i) && tila.pankki >= hinta(k));
+      const ostettavaa = KUUTIOT.some((k, i) => !omistaaUlkoasun(i) && tila.pankki >= hinta(k));
       document.getElementById("pankkiTeksti").textContent =
         "Pankki: " + tila.pankki + (ostettavaa ? "  – voit ostaa!" : "");
       const taytto = document.getElementById("pankkiTaytto");
@@ -1286,7 +1291,7 @@
       // Näytetään halvimmat ensin (tallennetut ostokset säilyvät, koska numerointi ei muutu)
       KUUTIOT.map((k, i) => i).sort((a, b) => hinta(KUUTIOT[a]) - hinta(KUUTIOT[b])).forEach(i => {
         const k = KUUTIOT[i];
-        const omistaa = tila.omistetut.includes(i);
+        const omistaa = omistaaUlkoasun(i);
         const rivi = document.createElement("div");
         rivi.className = "tuote";
         rivi.innerHTML = '<div class="nayte" style="background:' + naytteenTausta(k) + '"></div><span>' + k.nimi + "</span>";
